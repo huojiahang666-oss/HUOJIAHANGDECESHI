@@ -1,77 +1,101 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>聊天室（带记录）</title>
+<style>
+body { font-family: Arial; background: #f0f0f0; }
+#chat { width: 500px; margin: 50px auto; background: #fff; padding: 20px; border-radius: 10px; }
+#messages { height: 300px; border: 1px solid #ccc; overflow-y: scroll; margin-bottom: 10px; padding: 5px; }
+#input { width: 75%; padding: 5px; }
+button { padding: 6px 10px; }
+.system { color: gray; font-style: italic; }
+</style>
+</head>
+<body>
 
-import tkinter as tk
-from tkinter import simpledialog, scrolledtext
-import asyncio
-import websockets
-import threading
+<div id="chat">
+    <h2>聊天室 <span id="count">(0人)</span></h2>
+    <div id="messages"></div>
+    <input id="input" placeholder="输入消息">
+    <button onclick="send()">发送</button>
+</div>
 
-# 修改为你的 ngrok 公网 wss 地址
-NGROK_URL = "wss://ducally-chemiluminescent-zenaida.ngrok-free.dev"
+<script>
+const ws = new WebSocket("wss://ducally-chemiluminescent-zenaida.ngrok-free.dev");
 
-class ChatClient:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("聊天室")
-        self.loop = asyncio.new_event_loop()
-        threading.Thread(target=self.loop.run_forever, daemon=True).start()
+let username = prompt("请输入用户名：") || "游客";
 
-        # 聊天记录框
-        self.text_area = scrolledtext.ScrolledText(root, state='disabled', width=50, height=20)
-        self.text_area.pack(padx=10, pady=10)
+const messages = document.getElementById("messages");
+const count = document.getElementById("count");
 
-        # 输入框
-        self.input_field = tk.Entry(root, width=40)
-        self.input_field.pack(side=tk.LEFT, padx=(10,0), pady=(0,10))
+// 颜色
+function getColor(name) {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+        hash += name.charCodeAt(i);
+    }
+    return "hsl(" + (hash % 360) + ",70%,50%)";
+}
 
-        send_button = tk.Button(root, text="发送", command=self.on_send)
-        send_button.pack(side=tk.LEFT, padx=(5,10), pady=(0,10))
+// 连接
+ws.onopen = () => {
+    ws.send(JSON.stringify({ username: username }));
+};
 
-        # 用户名
-        self.username = simpledialog.askstring("用户名", "请输入用户名:", parent=self.root)
-        if not self.username:
-            self.username = "匿名"
+// 收消息
+ws.onmessage = (e) => {
+    const data = JSON.parse(e.data);
 
-        self.websocket = None
-        # 连接服务器
-        asyncio.run_coroutine_threadsafe(self.connect(), self.loop)
+    if (data.type === "history") {
+        // ✅ 加载历史
+        data.messages.forEach(msg => {
+            appendChatMessage(msg.user, msg.message);
+        });
+    } 
+    else if (data.type === "system") {
+        appendSystemMessage(data.message);
+        count.innerText = `(${data.count}人)`;
+    } 
+    else {
+        appendChatMessage(data.user, data.message);
+    }
+};
 
-    async def connect(self):
-        try:
-            self.websocket = await websockets.connect(NGROK_URL)
-            asyncio.create_task(self.receive_messages())
-        except Exception as e:
-            self.append_text(f"[错误] 无法连接服务器: {e}")
+// 发消息
+function send() {
+    const input = document.getElementById("input");
+    const text = input.value.trim();
+    if (!text) return;
 
-    async def receive_messages(self):
-        try:
-            async for message in self.websocket:
-                self.append_text(message)
-        except Exception as e:
-            self.append_text(f"[错误] 连接断开: {e}")
+    ws.send(text);
+    input.value = "";
+}
 
-    def append_text(self, message):
-        self.text_area.configure(state='normal')
-        self.text_area.insert(tk.END, message + "\n")
-        self.text_area.configure(state='disabled')
-        self.text_area.see(tk.END)
+// 回车发送
+document.getElementById("input").addEventListener("keypress", e => {
+    if (e.key === "Enter") send();
+});
 
-    async def send_message_async(self, message):
-        if self.websocket:
-            try:
-                await self.websocket.send(f"{self.username}: {message}")
-            except Exception as e:
-                self.append_text(f"[错误] 发送失败: {e}")
+// 聊天消息
+function appendChatMessage(user, msg) {
+    const div = document.createElement("div");
+    const time = new Date().toLocaleTimeString();
 
-    def on_send(self):
-        message = self.input_field.get().strip()
-        if message:
-            self.append_text(f"{self.username}: {message}")  # 显示自己消息
-            asyncio.run_coroutine_threadsafe(self.send_message_async(message), self.loop)
-            self.input_field.delete(0, tk.END)
+    div.innerHTML = `<span style="color:${getColor(user)}">${user}</span> [${time}]: ${msg}`;
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+}
 
-if __name__ == "__main__":
-    root = tk.Tk()
-    ChatClient(root)
-    root.mainloop()
+// 系统消息
+function appendSystemMessage(msg) {
+    const div = document.createElement("div");
+    div.className = "system";
+    div.innerText = msg;
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+}
+</script>
+
+</body>
+</html>

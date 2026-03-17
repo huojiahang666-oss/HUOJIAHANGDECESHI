@@ -2,100 +2,146 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>聊天室（带记录）</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>聊天室</title>
 <style>
-body { font-family: Arial; background: #f0f0f0; }
-#chat { width: 500px; margin: 50px auto; background: #fff; padding: 20px; border-radius: 10px; }
-#messages { height: 300px; border: 1px solid #ccc; overflow-y: scroll; margin-bottom: 10px; padding: 5px; }
-#input { width: 75%; padding: 5px; }
-button { padding: 6px 10px; }
-.system { color: gray; font-style: italic; }
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        background-color: #f0f0f0;
+    }
+
+    #chat-window {
+        flex: 1;
+        width: 100%;
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 10px;
+        overflow-y: auto;
+        background-color: #ffffff;
+        box-sizing: border-box;
+        border-bottom: 1px solid #ccc;
+    }
+
+    .message {
+        margin-bottom: 10px;
+        word-break: break-word;
+    }
+
+    .self {
+        color: blue;
+    }
+
+    .other {
+        color: green;
+    }
+
+    #input-area {
+        display: flex;
+        width: 100%;
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 10px;
+        box-sizing: border-box;
+        background-color: #fff;
+    }
+
+    #message-input {
+        flex: 1;
+        padding: 10px;
+        font-size: 16px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+
+    #send-btn {
+        width: 80px;
+        margin-left: 10px;
+        font-size: 16px;
+        border: none;
+        background-color: #4CAF50;
+        color: white;
+        border-radius: 4px;
+        cursor: pointer;
+        touch-action: manipulation;
+    }
+
+    #send-btn:active {
+        background-color: #45a049;
+    }
 </style>
 </head>
 <body>
-
-<div id="chat">
-    <h2>聊天室 <span id="count">(0人)</span></h2>
-    <div id="messages"></div>
-    <input id="input" placeholder="输入消息">
-    <button onclick="send()">发送</button>
+<div id="chat-window"></div>
+<div id="input-area">
+    <input type="text" id="message-input" placeholder="输入消息...">
+    <button id="send-btn">发送</button>
 </div>
 
 <script>
-const ws = new WebSocket("wss://ducally-chemiluminescent-zenaida.ngrok-free.dev");
+const NGROK_URL = "wss://ducally-chemiluminescent-zenaida.ngrok-free.dev"; // 改成你的 WebSocket 地址
 
-let username = prompt("请输入用户名：") || "游客";
+let username = prompt("请输入用户名:");
+if(!username) username = "匿名";
 
-const messages = document.getElementById("messages");
-const count = document.getElementById("count");
+const chatWindow = document.getElementById("chat-window");
+const messageInput = document.getElementById("message-input");
+const sendBtn = document.getElementById("send-btn");
 
-// 颜色
-function getColor(name) {
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) {
-        hash += name.charCodeAt(i);
-    }
-    return "hsl(" + (hash % 360) + ",70%,50%)";
+let socket;
+
+function appendMessage(text, isSelf=false) {
+    const msgDiv = document.createElement("div");
+    msgDiv.className = "message " + (isSelf ? "self" : "other");
+    msgDiv.textContent = text;
+    chatWindow.appendChild(msgDiv);
+    chatWindow.scrollTop = chatWindow.scrollHeight; // 自动滚动到底部
 }
 
-// 连接
-ws.onopen = () => {
-    ws.send(JSON.stringify({ username: username }));
-};
+function connect() {
+    socket = new WebSocket(NGROK_URL);
 
-// 收消息
-ws.onmessage = (e) => {
-    const data = JSON.parse(e.data);
+    socket.onopen = () => {
+        appendMessage("已连接到服务器。", false);
+    };
 
-    if (data.type === "history") {
-        // ✅ 加载历史
-        data.messages.forEach(msg => {
-            appendChatMessage(msg.user, msg.message);
-        });
-    } 
-    else if (data.type === "system") {
-        appendSystemMessage(data.message);
-        count.innerText = `(${data.count}人)`;
-    } 
-    else {
-        appendChatMessage(data.user, data.message);
-    }
-};
+    socket.onmessage = (event) => {
+        const msg = event.data;
+        // 避免重复显示自己发送的消息
+        if(!msg.startsWith(username + ":")) {
+            appendMessage(msg, false);
+        }
+    };
 
-// 发消息
-function send() {
-    const input = document.getElementById("input");
-    const text = input.value.trim();
-    if (!text) return;
+    socket.onclose = () => {
+        appendMessage("已断开连接，尝试重连...", false);
+        setTimeout(connect, 3000);
+    };
 
-    ws.send(text);
-    input.value = "";
+    socket.onerror = (err) => {
+        console.error("WebSocket 错误", err);
+    };
 }
 
-// 回车发送
-document.getElementById("input").addEventListener("keypress", e => {
-    if (e.key === "Enter") send();
+sendBtn.addEventListener("click", () => {
+    const msg = messageInput.value.trim();
+    if(msg && socket && socket.readyState === WebSocket.OPEN) {
+        const fullMsg = `${username}: ${msg}`;
+        socket.send(fullMsg);
+        appendMessage(fullMsg, true);
+        messageInput.value = "";
+    }
 });
 
-// 聊天消息
-function appendChatMessage(user, msg) {
-    const div = document.createElement("div");
-    const time = new Date().toLocaleTimeString();
+messageInput.addEventListener("keypress", (e) => {
+    if(e.key === "Enter") sendBtn.click();
+});
 
-    div.innerHTML = `<span style="color:${getColor(user)}">${user}</span> [${time}]: ${msg}`;
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
-}
-
-// 系统消息
-function appendSystemMessage(msg) {
-    const div = document.createElement("div");
-    div.className = "system";
-    div.innerText = msg;
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
-}
+connect();
 </script>
-
 </body>
 </html>

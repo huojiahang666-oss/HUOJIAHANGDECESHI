@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>聊天室</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    #chat { border: 1px solid #ccc; height: 300px; overflow-y: scroll; padding: 10px; margin-bottom: 10px; }
+    #message { width: 80%; }
+    button { width: 18%; }
+  </style>
+</head>
+<body>
+  <h1>聊天室</h1>
+  <div id="chat"></div>
+  <input type="text" id="message" placeholder="输入消息..." />
+  <button onclick="sendMessage()">发送</button>
+
+  <script>
+    // ⚡ 改成你的 ngrok WebSocket 地址
+    const WS_URL = "wss://ducally-chemiluminescent-zenaida.ngrok-free.dev";
+
+    let ws = new WebSocket(WS_URL);
+    let chat = document.getElementById('chat');
+
+    ws.onopen = () => {
+      appendMessage("系统: 已连接到服务器");
+    };
+
+    ws.onmessage = (event) => {
+      appendMessage(event.data);
+    };
+
+    ws.onclose = () => {
+      appendMessage("系统: 与服务器断开连接");
+    };
+
+    function sendMessage() {
+      let input = document.getElementById('message');
+      if (input.value.trim() === "") return;
+      ws.send(input.value);
+      input.value = "";
+    }
+
+    function appendMessage(msg) {
+      let div = document.createElement('div');
+      div.textContent = msg;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+  </script>
+</body>
+</html>

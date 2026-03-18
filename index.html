@@ -736,6 +736,19 @@
              updateTopBar(lastCountText, typingUsers.size ? (Array.from(typingUsers).slice(0,2).join("、") + " 正在输入…") : ""); 
          } 
  
+         if (data.type === "kicked") { 
+             addSystem(data.text || "你已被踢出房间"); 
+             shouldReconnect = false; 
+             try { 
+                 if (ws) ws.close(); 
+             } catch {} 
+             roomKey = ""; 
+             roomId = null; 
+             isLockedRoom = false; 
+             location.search = "?room=lobby"; 
+             return; 
+         } 
+ 
          if (roomId && data.room && data.room !== roomId) { 
              return; 
          } 

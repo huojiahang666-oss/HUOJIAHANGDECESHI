@@ -579,16 +579,17 @@ imageInput.addEventListener("change", (e) => {
             return; 
         } 
         try { 
-            ws.send(JSON.stringify({ 
-                type: "image", 
-                image: ev.target.result, 
-                replyTo: replyToId || undefined 
-            })); 
-            clearReply(); 
-        } catch (err) { 
-            console.error(err); 
-            addSystem("图片发送失败: " + err.message); 
-        } 
+             ws.send(JSON.stringify({ 
+                 type: "image", 
+                 image: ev.target.result, 
+                 replyTo: replyToId || undefined 
+             })); 
+             clearReply(); 
+             addSystem("图片正在发送中..."); 
+         } catch (err) { 
+             console.error(err); 
+             addSystem("图片发送失败: " + err.message); 
+         } 
     }; 
     reader.onerror = () => { 
         addSystem("读取图片失败"); 
@@ -919,10 +920,14 @@ msgInput.addEventListener("focus", () => {
          } 
  
          if (data.type === "me") { 
-             addMessage(data); 
-         } 
- 
-         if (data.type === "typing") { 
+            addMessage(data); 
+        } 
+
+        if (data.type === "image") { 
+            addMessage(data); 
+        } 
+
+        if (data.type === "typing") { 
              setTypingUser(data.user, data.isTyping); 
          } 
  

@@ -737,7 +737,11 @@
          } 
  
          if (data.type === "kicked") { 
-             addSystem(data.text || "你已被踢出房间"); 
+            const kickedMsg = data.text || "你已被踢出房间"; 
+            addSystem(kickedMsg); 
+            try { 
+                alert(kickedMsg); 
+            } catch {} 
              shouldReconnect = false; 
              try { 
                  if (ws) ws.close(); 

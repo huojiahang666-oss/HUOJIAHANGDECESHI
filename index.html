@@ -52,6 +52,9 @@
     height: 100vh; 
     height: 100dvh; 
     overflow: hidden; 
+    /* 提升移动端平滑度 */ 
+    will-change: height, top; 
+    transition: height 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.2s cubic-bezier(0.2, 0.8, 0.2, 1); 
 } 
 
 /* 顶部 */ 
@@ -785,14 +788,14 @@
         typingSent = false; 
         sendTyping(false); 
     } 
-    // 强制重置滚动，防止键盘收起后页面留白 
+    // 强制立即重置并更新，利用 CSS transition 实现平滑 
     window.scrollTo(0, 0); 
-    setTimeout(updateHeight, 100); 
+    updateHeight(); 
 }); 
 msgInput.addEventListener("focus", () => { 
-    // 强制重置滚动 
+    // 强制立即更新 
     window.scrollTo(0, 0); 
-    setTimeout(updateHeight, 100); 
+    updateHeight(); 
 }); 
  
  let ws; 
@@ -911,28 +914,34 @@ msgInput.addEventListener("focus", () => {
  }); 
  
  /* ✅ 终极防遮挡 */ 
+let updateHeightPending = false; 
 function updateHeight() { 
-    const chat = document.getElementById("chat"); 
-    const main = document.getElementById("main"); 
-    const wasNearBottom = (chat.scrollHeight - chat.scrollTop - chat.clientHeight) < 60; 
+    if (updateHeightPending) return; 
+    updateHeightPending = true; 
+    
+    requestAnimationFrame(() => { 
+        const chat = document.getElementById("chat"); 
+        const main = document.getElementById("main"); 
+        const wasNearBottom = (chat.scrollHeight - chat.scrollTop - chat.clientHeight) < 60; 
 
-    if (window.visualViewport) { 
-        // 关键：将主容器同步到视觉视口的高度和偏移量 
-        const { height, offsetTop } = window.visualViewport; 
-        main.style.height = height + "px"; 
-        main.style.top = offsetTop + "px"; 
-        
-        // 强制重置全局滚动，防止 iOS 将页面整体顶上去 
-        if (offsetTop > 0) { 
-            window.scrollTo(0, 0); 
+        if (window.visualViewport) { 
+            const { height, offsetTop } = window.visualViewport; 
+            main.style.height = height + "px"; 
+            main.style.top = offsetTop + "px"; 
+            
+            // 只有当键盘完全收回或刚弹出时才尝试强制 scrollTo，避免过度干预 
+            if (offsetTop > 0) { 
+                window.scrollTo(0, 0); 
+            } 
+        } else { 
+            main.style.height = window.innerHeight + "px"; 
         } 
-    } else { 
-        main.style.height = window.innerHeight + "px"; 
-    } 
 
-    if (wasNearBottom) { 
-        setTimeout(scrollBottom, 0); 
-    } 
+        if (wasNearBottom) { 
+            scrollBottom(); 
+        } 
+        updateHeightPending = false; 
+    }); 
 } 
 
 if (window.visualViewport) { 
@@ -1188,12 +1197,15 @@ function openMessageActions(mid) {
  } 
  
  /* 滚动 */ 
- function scrollBottom() { 
-     const chat = document.getElementById("chat"); 
-     setTimeout(() => { 
-         chat.scrollTop = chat.scrollHeight; 
-     }, 50); 
- } 
+function scrollBottom() { 
+    const chat = document.getElementById("chat"); 
+    requestAnimationFrame(() => { 
+        chat.scrollTo({ 
+            top: chat.scrollHeight, 
+            behavior: "smooth" 
+        }); 
+    }); 
+} 
  
  /* 回车 */ 
  document.getElementById("msg").addEventListener("keydown", (e) => { 

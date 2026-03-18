@@ -116,8 +116,51 @@
  </div> 
  
  <script> 
- const username = prompt("用户名") || "匿名"; 
- const ws = new WebSocket("wss://ducally-chemiluminescent-zenaida.ngrok-free.dev"); 
+ let username = localStorage.getItem("chat_username"); 
+ if (!username) { 
+     username = (prompt("用户名") || "匿名").trim() || "匿名"; 
+     localStorage.setItem("chat_username", username); 
+ } 
+ 
+ let ws; 
+ function connect() { 
+     ws = new WebSocket("wss://9yz156id7106.vicp.fun"); 
+ 
+     ws.onopen = () => { 
+         addSystem("已连接"); 
+         ws.send(JSON.stringify({user: username})); 
+     }; 
+ 
+     ws.onmessage = (e) => { 
+         const data = JSON.parse(e.data); 
+ 
+         if (data.type === "count") { 
+             document.getElementById("topBar").innerText = "在线人数: " + data.count; 
+         } 
+ 
+         if (data.type === "system") { 
+             addSystem(data.text); 
+         } 
+ 
+         if (data.type === "chat") { 
+             addMessage(data); 
+         } 
+ 
+         if (data.type === "pm") { 
+             addMessage(data); 
+         } 
+     }; 
+ 
+     ws.onerror = () => { 
+         addSystem("连接失败"); 
+     }; 
+ 
+     ws.onclose = () => { 
+         addSystem("连接断开，正在重连..."); 
+         setTimeout(connect, 1000); 
+     }; 
+ } 
+ connect(); 
  
  /* ✅ 终极防遮挡 */ 
  function updateHeight() { 
@@ -137,31 +180,6 @@
  document.addEventListener("focusin", () => setTimeout(updateHeight, 300)); 
  
  setTimeout(updateHeight, 300); 
- 
- /* WebSocket */ 
- ws.onopen = () => { 
-     ws.send(JSON.stringify({user: username})); 
- }; 
- 
- ws.onmessage = (e) => { 
-     const data = JSON.parse(e.data); 
- 
-     if (data.type === "count") { 
-         document.getElementById("topBar").innerText = "在线人数: " + data.count; 
-     } 
- 
-     if (data.type === "system") { 
-         addSystem(data.text); 
-     } 
- 
-     if (data.type === "chat") { 
-         addMessage(data); 
-     } 
- 
-     if (data.type === "pm") { 
-         addMessage(data); 
-     } 
- }; 
  
  /* 添加消息 */ 
  function addMessage(data) { 
@@ -207,6 +225,10 @@
      const input = document.getElementById("msg"); 
      const text = input.value.trim(); 
      if (!text) return; 
+     if (!ws || ws.readyState !== WebSocket.OPEN) { 
+         addSystem("未连接，稍后再试"); 
+         return; 
+     } 
  
      if (text.startsWith("/pm ")) { 
          const rest = text.slice(4).trim(); 

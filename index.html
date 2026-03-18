@@ -475,7 +475,7 @@
  let isLockedRoom = false; 
  let ownerName = ""; 
  let isOwner = false; 
-  const helpTextFull = "🌟 聊天室功能全指引 🌟\n\n【基础操作】\n• 发送：回车键发送，Shift+回车换行\n• 图片：点击下方“图片”按钮发送压缩图\n• 缩放：点击聊天图片可查看大图\n• 清屏：点击顶部“清屏”按钮清空本地记录\n• 历史：点击顶部“查看更多”加载旧消息\n\n【快捷指令】\n• /pm 用户名 内容：发起私聊\n• /room 房间名：进入普通房间\n• /proom 房间名：进入密码房间\n• /roll 1d100：掷骰子互动\n• /flip：抛硬币 (正面/反面)\n• /me 动作：发送动作消息\n• /block 用户名：本地屏蔽某人\n• /unblock 用户名：取消屏蔽\n\n【互动管理】\n• 消息操作：点击消息右侧“⋯”或长按/右键\n  (包含：回复、表态、撤回、屏蔽)\n• 房主特权 (仅限密码房)：\n  /kick 用户名：踢出房间 (1分钟禁入)\n  /mute 用户名：禁言\n  /unmute 用户名：解除禁言"; 
+  const helpTextFull = "🌟 聊天室功能全指引 🌟\n\n【基础操作】\n• 发送：回车键发送，Shift+回车换行\n• 图片：点击下方“图片”按钮发送压缩图\n• 缩放：点击聊天图片可查看大图\n• 改名：输入 /nick 新名字 (一周限3次)\n• 清屏：点击顶部“清屏”按钮清空本地记录\n• 历史：点击顶部“查看更多”加载旧消息\n\n【快捷指令】\n• /nick 新名字：修改你的用户名\n• /pm 用户名 内容：发起私聊\n• /room 房间名：进入普通房间\n• /proom 房间名：进入密码房间\n• /roll 1d100：掷骰子互动\n• /flip：抛硬币 (正面/反面)\n• /me 动作：发送动作消息\n• /block 用户名：本地屏蔽某人\n• /unblock 用户名：取消屏蔽\n\n【互动管理】\n• 消息操作：点击消息右侧“⋯”或长按/右键\n  (包含：回复、表态、撤回、屏蔽)\n• 房主特权 (仅限密码房)：\n  /kick 用户名：踢出房间 (1分钟禁入)\n  /mute 用户名：禁言\n  /unmute 用户名：解除禁言"; 
   
   const typingEl = document.getElementById("typing"); 
   document.getElementById("showHelp").addEventListener("click", () => { 
@@ -1105,6 +1105,35 @@ window.addEventListener("resize", updateHeight);
  
  setTimeout(updateHeight, 300); 
  
+function changeUsername(newName) {
+    const now = Date.now();
+    const oneWeek = 7 * 24 * 60 * 60 * 1000;
+    let changes = JSON.parse(localStorage.getItem("chat_name_changes") || "[]");
+    
+    // 过滤掉一周以前的记录
+    changes = changes.filter(t => now - t < oneWeek);
+    
+    if (changes.length >= 3) {
+        const oldest = changes[0];
+        const nextAvailable = new Date(oldest + oneWeek).toLocaleString();
+        addSystem(`改名失败：一周内仅限修改3次。下一次可用时间：${nextAvailable}`);
+        return;
+    }
+    
+    const oldName = username;
+    const cleanName = (newName || "").trim().slice(0, 30);
+    if (!cleanName || cleanName === oldName) return;
+    
+    username = cleanName;
+    localStorage.setItem("chat_username", username);
+    changes.push(now);
+    localStorage.setItem("chat_name_changes", JSON.stringify(changes));
+    
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({type: "rename", newName: username}));
+    }
+}
+
 /* 添加消息 */ 
 function addMessage(data, prepend = false) { 
     const chat = document.getElementById("chat"); 
@@ -1383,6 +1412,18 @@ function addSystem(text) {
              return; 
          } 
          ws.send(JSON.stringify({type: "pm", to: to, text: pmText})); 
+         input.value = ""; 
+         return; 
+     } 
+ 
+     if (text.startsWith("/nick ")) { 
+         const newName = text.slice(6).trim(); 
+         if (!newName) { 
+             addSystem("用法: /nick 新名字"); 
+             input.value = ""; 
+             return; 
+         } 
+         changeUsername(newName); 
          input.value = ""; 
          return; 
      } 

@@ -783,8 +783,12 @@
  /* 发送 */ 
  function send() { 
      const input = document.getElementById("msg"); 
-     const text = input.value.trim(); 
-     if (!text) return; 
+     const raw = (input.value || "").replace(/\u00A0/g, " ").replace(/[\u200B-\u200D\uFEFF]/g, ""); 
+     const text = raw.trim(); 
+     if (!text) { 
+         input.value = ""; 
+         return; 
+     } 
      if (!ws || ws.readyState !== WebSocket.OPEN) { 
          addSystem("未连接，稍后再试"); 
          return; 
@@ -876,8 +880,8 @@
  /* 回车 */ 
  document.getElementById("msg").addEventListener("keydown", (e) => { 
      if (e.key !== "Enter") return; 
-     if (e.shiftKey) return; 
      if (e.isComposing) return; 
+     if (!(e.ctrlKey || e.metaKey)) return; 
      e.preventDefault(); 
      send(); 
  }); 

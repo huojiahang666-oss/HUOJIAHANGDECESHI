@@ -578,12 +578,20 @@ imageInput.addEventListener("change", (e) => {
             addSystem("未连接，稍后再试"); 
             return; 
         } 
-        ws.send(JSON.stringify({ 
-            type: "image", 
-            image: ev.target.result, 
-            replyTo: replyToId || undefined 
-        })); 
-        clearReply(); 
+        try { 
+            ws.send(JSON.stringify({ 
+                type: "image", 
+                image: ev.target.result, 
+                replyTo: replyToId || undefined 
+            })); 
+            clearReply(); 
+        } catch (err) { 
+            console.error(err); 
+            addSystem("图片发送失败: " + err.message); 
+        } 
+    }; 
+    reader.onerror = () => { 
+        addSystem("读取图片失败"); 
     }; 
     reader.readAsDataURL(file); 
     imageInput.value = ""; 

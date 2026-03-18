@@ -874,8 +874,12 @@
  } 
  
  /* 回车 */ 
- document.getElementById("msg").addEventListener("keypress", e=>{ 
-     if(e.key==="Enter") send(); 
+ document.getElementById("msg").addEventListener("keydown", (e) => { 
+     if (e.key !== "Enter") return; 
+     if (e.shiftKey) return; 
+     if (e.isComposing) return; 
+     e.preventDefault(); 
+     send(); 
  }); 
  </script> 
  

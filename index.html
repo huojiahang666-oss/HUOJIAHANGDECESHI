@@ -52,6 +52,7 @@
      overflow: hidden; 
      text-overflow: ellipsis; 
      max-width: 45vw; 
+     cursor: pointer; 
  } 
  
  #topRight { 
@@ -243,7 +244,7 @@
          <div id="topRight"> 
              <input id="searchInput" placeholder="搜索" style="display:none;"> 
              <button class="topBtn" id="searchToggle">搜索</button> 
-             <button class="topBtn" id="exitRoom">退出</button> 
+             <button class="topBtn" id="exitRoom" style="display:none;">退出</button> 
          </div> 
      </div> 
      <div id="chat"></div> 
@@ -293,6 +294,13 @@
  
  let roomId = null; 
  let isLockedRoom = false; 
+ const helpTextShort = "回车发送 | /pm 私聊 | /room 普通房 | /proom 密码房 | /roll /flip /me | /block"; 
+ const helpTextFull = "功能用法：\\n回车发送（Shift+回车不发送）\\n/pm 用户名 内容（私聊）\\n/room 房间名（普通房）\\n/proom 房间名（密码房）\\n/roll 1d100（掷骰）\\n/flip（抛硬币）\\n/me 动作（动作消息）\\n/block 用户名（屏蔽）\\n/unblock 用户名（取消屏蔽）\\n右键/长按消息：回复、表态、撤回、屏蔽"; 
+ 
+ const typingEl = document.getElementById("typing"); 
+ typingEl.addEventListener("click", () => { 
+     alert(helpTextFull); 
+ }); 
  
  const blocked = new Set(JSON.parse(localStorage.getItem("chat_blocked") || "[]")); 
  function saveBlocked() { 
@@ -404,7 +412,8 @@
  function updateTopBar(countText, typingText) { 
      const title = "聊天室 · " + displayRoom + (isLockedRoom ? " 🔒" : "") + (countText ? (" · " + countText) : ""); 
      document.getElementById("roomTitle").innerText = title; 
-     document.getElementById("typing").innerText = typingText || ""; 
+     document.getElementById("typing").innerText = typingText || helpTextShort; 
+     document.getElementById("exitRoom").style.display = isLockedRoom ? "" : "none"; 
  } 
  updateTopBar("", ""); 
  let lastCountText = ""; 
@@ -525,6 +534,9 @@
  } 
  
  const msgInput = document.getElementById("msg"); 
+ let composing = false; 
+ msgInput.addEventListener("compositionstart", () => { composing = true; }); 
+ msgInput.addEventListener("compositionend", () => { composing = false; }); 
  msgInput.addEventListener("input", () => { 
      if (!typingSent) { 
          typingSent = true; 
@@ -920,8 +932,9 @@
  /* 回车 */ 
  document.getElementById("msg").addEventListener("keydown", (e) => { 
      if (e.key !== "Enter") return; 
-     if (e.isComposing) return; 
-     if (!(e.ctrlKey || e.metaKey)) return; 
+     if (e.shiftKey) return; 
+     if (e.isComposing || composing) return; 
+     if (e.repeat) return; 
      e.preventDefault(); 
      send(); 
  }); 

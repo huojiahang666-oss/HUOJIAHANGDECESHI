@@ -2,7 +2,7 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>聊天室</title>
 
 <style>
@@ -13,7 +13,7 @@ body {
     height: 100vh;
 }
 
-/* 左侧用户列表 */
+/* 左侧用户 */
 #sidebar {
     width: 80px;
     background: #2c3e50;
@@ -22,8 +22,8 @@ body {
 }
 
 .user {
-    padding: 10px;
     text-align: center;
+    padding: 10px;
     border-bottom: 1px solid #444;
 }
 
@@ -31,17 +31,17 @@ body {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: #aaa;
     margin: auto;
 }
 
-/* 右侧聊天 */
+/* 主区域 */
 #main {
     flex: 1;
     display: flex;
     flex-direction: column;
 }
 
+/* 顶部 */
 #topBar {
     height: 40px;
     background: #4caf50;
@@ -51,53 +51,74 @@ body {
     padding: 0 10px;
 }
 
+/* 聊天区 */
 #chat {
-    flex: 1;
     overflow-y: auto;
     padding: 10px;
+    box-sizing: border-box;
 }
 
+/* 消息 */
 .message {
-    margin: 10px 0;
     display: flex;
     flex-direction: column;
+    margin: 10px 0;
 }
 
 .left { align-items: flex-start; }
 .right { align-items: flex-end; }
 
+.username {
+    font-size: 12px;
+    color: gray;
+}
+
 .bubble {
     padding: 10px;
     border-radius: 10px;
     max-width: 70%;
+    margin-top: 2px;
+    word-break: break-word;
 }
 
 .left .bubble { background: #eee; }
 .right .bubble { background: #4caf50; color: white; }
 
+.time {
+    font-size: 10px;
+    color: gray;
+}
+
+/* 系统 */
 .system {
     text-align: center;
     color: gray;
 }
 
-/* 输入 */
+/* 输入区 */
 #inputArea {
+    position: fixed;
+    bottom: 0;
+    width: calc(100% - 80px);
     height: 60px;
     display: flex;
+    background: white;
     border-top: 1px solid #ccc;
+    padding-bottom: env(safe-area-inset-bottom);
 }
 
 #msg {
     flex: 1;
     border: none;
     padding: 10px;
+    font-size: 16px;
 }
 
 button {
     width: 80px;
+    border: none;
     background: #4caf50;
     color: white;
-    border: none;
 }
 </style>
 </head>
@@ -111,7 +132,7 @@ button {
     <div id="chat"></div>
 
     <div id="inputArea">
-        <input id="msg">
+        <input id="msg" placeholder="输入消息...">
         <button onclick="send()">发送</button>
     </div>
 </div>
@@ -120,12 +141,26 @@ button {
 const username = prompt("用户名") || "匿名";
 const ws = new WebSocket("wss://ducally-chemiluminescent-zenaida.ngrok-free.dev");
 
-// 随机头像颜色
-function getColor(name) {
-    const colors = ["red","blue","green","orange","purple"];
-    return colors[name.length % colors.length];
+/* ✅ 终极防遮挡 */
+function updateHeight() {
+    const chat = document.getElementById("chat");
+    const inputH = document.getElementById("inputArea").offsetHeight;
+    const topH = document.getElementById("topBar").offsetHeight;
+
+    const viewH = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+
+    chat.style.height = (viewH - inputH - topH) + "px";
 }
 
+if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", updateHeight);
+}
+window.addEventListener("resize", updateHeight);
+document.addEventListener("focusin", () => setTimeout(updateHeight, 300));
+
+setTimeout(updateHeight, 300);
+
+/* WebSocket */
 ws.onopen = () => {
     ws.send(JSON.stringify({user: username}));
 };
@@ -167,6 +202,41 @@ ws.onmessage = (e) => {
     }
 };
 
+/* 随机颜色头像 */
+function getColor(name) {
+    const colors = ["#f44336","#2196f3","#4caf50","#ff9800","#9c27b0"];
+    return colors[name.length % colors.length];
+}
+
+/* 添加消息 */
+function addMessage(data) {
+    const chat = document.getElementById("chat");
+    const isMe = data.user === username;
+
+    const msg = document.createElement("div");
+    msg.className = "message " + (isMe ? "right" : "left");
+
+    const name = document.createElement("div");
+    name.className = "username";
+    name.innerText = data.user;
+
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.innerText = data.text;
+
+    const time = document.createElement("div");
+    time.className = "time";
+    time.innerText = data.time;
+
+    msg.appendChild(name);
+    msg.appendChild(bubble);
+    msg.appendChild(time);
+
+    chat.appendChild(msg);
+    scrollBottom();
+}
+
+/* 系统消息 */
 function addSystem(text) {
     const chat = document.getElementById("chat");
     const div = document.createElement("div");
@@ -175,30 +245,28 @@ function addSystem(text) {
     chat.appendChild(div);
 }
 
-function addMessage(data) {
-    const chat = document.getElementById("chat");
-    const isMe = data.user === username;
-
-    const msg = document.createElement("div");
-    msg.className = "message " + (isMe ? "right" : "left");
-
-    const bubble = document.createElement("div");
-    bubble.className = "bubble";
-    bubble.innerText = data.text;
-
-    msg.appendChild(bubble);
-    chat.appendChild(msg);
-
-    chat.scrollTop = chat.scrollHeight;
-}
-
+/* 发送 */
 function send() {
     const input = document.getElementById("msg");
-    if (!input.value) return;
+    const text = input.value.trim();
+    if (!text) return;
 
-    ws.send(JSON.stringify({text: input.value}));
+    ws.send(JSON.stringify({text: text}));
     input.value = "";
 }
+
+/* 滚动 */
+function scrollBottom() {
+    const chat = document.getElementById("chat");
+    setTimeout(() => {
+        chat.scrollTop = chat.scrollHeight;
+    }, 50);
+}
+
+/* 回车 */
+document.getElementById("msg").addEventListener("keypress", e=>{
+    if(e.key==="Enter") send();
+});
 </script>
 
 </body>

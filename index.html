@@ -2,7 +2,7 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>聊天室</title>
 
 <style>
@@ -12,6 +12,7 @@ body {
     background: #f5f5f5;
 }
 
+/* 顶部 */
 #topBar {
     height: 40px;
     background: #4caf50;
@@ -21,9 +22,11 @@ body {
     padding: 0 10px;
 }
 
+/* 聊天区 */
 #chat {
     overflow-y: auto;
     padding: 10px;
+    box-sizing: border-box;
 }
 
 /* 消息 */
@@ -48,16 +51,11 @@ body {
     padding: 10px;
     border-radius: 10px;
     margin-top: 2px;
+    word-break: break-word;
 }
 
-.left .bubble {
-    background: white;
-}
-
-.right .bubble {
-    background: #4caf50;
-    color: white;
-}
+.left .bubble { background: white; }
+.right .bubble { background: #4caf50; color: white; }
 
 /* 时间 */
 .time {
@@ -82,12 +80,15 @@ body {
     display: flex;
     background: white;
     border-top: 1px solid #ccc;
+    padding-bottom: env(safe-area-inset-bottom);
 }
 
 #msg {
     flex: 1;
     padding: 10px;
     border: none;
+    outline: none;
+    font-size: 16px;
 }
 
 button {
@@ -110,21 +111,44 @@ button {
 </div>
 
 <script>
-const username = prompt("用户名") || "匿名";
+const username = prompt("请输入用户名") || "匿名";
+
+// ⚠️ 换成你的 ngrok 地址
 const ws = new WebSocket("wss://ducally-chemiluminescent-zenaida.ngrok-free.dev");
 
-// 动态高度（防遮挡）
+/* =========================
+   ✅ 核心：终极防键盘遮挡
+========================= */
 function updateHeight() {
     const chat = document.getElementById("chat");
-    const input = document.getElementById("inputArea").offsetHeight;
-    const top = document.getElementById("topBar").offsetHeight;
+    const inputH = document.getElementById("inputArea").offsetHeight;
+    const topH = document.getElementById("topBar").offsetHeight;
 
-    chat.style.height = (window.innerHeight - input - top) + "px";
+    const viewH = window.visualViewport 
+        ? window.visualViewport.height 
+        : window.innerHeight;
+
+    chat.style.height = (viewH - inputH - topH) + "px";
+}
+
+// 多重监听（保证100%触发）
+if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", updateHeight);
 }
 window.addEventListener("resize", updateHeight);
+window.addEventListener("orientationchange", updateHeight);
+
+// 输入时强制修正（关键）
+document.addEventListener("focusin", () => {
+    setTimeout(updateHeight, 300);
+});
+
+// 初始化
 setTimeout(updateHeight, 300);
 
-// 连接
+/* =========================
+   WebSocket
+========================= */
 ws.onopen = () => {
     ws.send(JSON.stringify({
         user: username
@@ -136,15 +160,19 @@ ws.onmessage = (e) => {
     render(data);
 };
 
-// 渲染
+/* =========================
+   渲染消息
+========================= */
 function render(data) {
     const chat = document.getElementById("chat");
 
+    // 在线人数
     if (data.type === "count") {
         document.getElementById("topBar").innerText = "在线人数: " + data.count;
         return;
     }
 
+    // 系统消息
     if (data.type === "system") {
         const div = document.createElement("div");
         div.className = "system";
@@ -152,6 +180,7 @@ function render(data) {
         chat.appendChild(div);
     }
 
+    // 聊天消息
     if (data.type === "chat") {
         const isMe = data.user === username;
 
@@ -177,12 +206,12 @@ function render(data) {
         chat.appendChild(msg);
     }
 
-    setTimeout(() => {
-        chat.scrollTop = chat.scrollHeight;
-    }, 50);
+    scrollToBottom();
 }
 
-// 发送
+/* =========================
+   发送
+========================= */
 function send() {
     const input = document.getElementById("msg");
     const text = input.value.trim();
@@ -195,10 +224,18 @@ function send() {
     input.value = "";
 }
 
-// 回车发送
+/* 回车发送 */
 document.getElementById("msg").addEventListener("keypress", e => {
     if (e.key === "Enter") send();
 });
+
+/* 自动滚动 */
+function scrollToBottom() {
+    const chat = document.getElementById("chat");
+    setTimeout(() => {
+        chat.scrollTop = chat.scrollHeight;
+    }, 50);
+}
 </script>
 
 </body>

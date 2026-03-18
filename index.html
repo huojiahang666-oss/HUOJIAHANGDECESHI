@@ -22,9 +22,8 @@ body {
     padding: 0 10px;
 }
 
-/* 聊天区 */
+/* 聊天区（高度用JS控制） */
 #chat {
-    height: calc(100vh - 100px);
     overflow-y: auto;
     padding: 10px;
     box-sizing: border-box;
@@ -39,14 +38,12 @@ body {
 .left { justify-content: flex-start; }
 .right { justify-content: flex-end; }
 
-/* 系统消息 */
 .system {
     text-align: center;
     color: gray;
     font-size: 12px;
 }
 
-/* 气泡 */
 .bubble {
     max-width: 70%;
     padding: 10px;
@@ -73,6 +70,7 @@ body {
     padding: 10px;
     border: none;
     outline: none;
+    font-size: 16px;
 }
 
 button {
@@ -87,7 +85,6 @@ button {
 <body>
 
 <div id="topBar">聊天室</div>
-
 <div id="chat"></div>
 
 <div id="inputArea">
@@ -97,12 +94,19 @@ button {
 
 <script>
 const username = prompt("请输入用户名") || "匿名";
-
-// ⚠️ 换成你的 ngrok 地址
 const ws = new WebSocket("wss://ducally-chemiluminescent-zenaida.ngrok-free.dev");
 
+// ✅ 关键：动态适配高度（解决键盘遮挡）
+function setHeight() {
+    const vh = window.innerHeight;
+    document.getElementById("chat").style.height = (vh - 100) + "px";
+}
+
+window.addEventListener("resize", setHeight);
+setHeight();
+
+// 连接
 ws.onopen = () => {
-    // 发送用户名（关键！）
     ws.send(username);
 };
 
@@ -110,16 +114,15 @@ ws.onmessage = (e) => {
     addMessage(e.data);
 };
 
+// 添加消息
 function addMessage(text) {
     const chat = document.getElementById("chat");
 
-    // 👥 在线人数显示
     if (text.startsWith("👥")) {
         document.getElementById("topBar").innerText = text;
         return;
     }
 
-    // 系统消息
     if (text.startsWith("🔔") || text.startsWith("❌")) {
         const div = document.createElement("div");
         div.className = "system";
@@ -144,19 +147,26 @@ function addMessage(text) {
     }, 50);
 }
 
+// 发送
 function send() {
     const input = document.getElementById("msg");
     const text = input.value.trim();
     if (!text) return;
 
     ws.send(username + ": " + text);
-
     input.value = "";
 }
 
 // 回车发送
 document.getElementById("msg").addEventListener("keypress", function(e){
     if(e.key === "Enter") send();
+});
+
+// ✅ 输入时自动滚到底（防遮挡）
+document.getElementById("msg").addEventListener("focus", () => {
+    setTimeout(() => {
+        document.getElementById("chat").scrollTop = document.getElementById("chat").scrollHeight;
+    }, 300);
 });
 </script>
 

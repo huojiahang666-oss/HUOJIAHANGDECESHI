@@ -350,8 +350,10 @@
  
  let roomId = null; 
  let isLockedRoom = false; 
+ let ownerName = ""; 
+ let isOwner = false; 
  const helpTextShort = "回车发送 | /pm 私聊 | /room 普通房 | /proom 密码房 | /roll /flip /me | /block"; 
- const helpTextFull = "功能用法：\\n回车发送（Shift+回车不发送）\\n/pm 用户名 内容（私聊）\\n/room 房间名（普通房）\\n/proom 房间名（密码房）\\n/roll 1d100（掷骰）\\n/flip（抛硬币）\\n/me 动作（动作消息）\\n/block 用户名（屏蔽）\\n/unblock 用户名（取消屏蔽）\\n右键/长按消息：回复、表态、撤回、屏蔽"; 
+ const helpTextFull = "功能用法：\\n回车发送（Shift+回车不发送）\\n/pm 用户名 内容（私聊）\\n/room 房间名（普通房）\\n/proom 房间名（密码房）\\n/roll 1d100（掷骰）\\n/flip（抛硬币）\\n/me 动作（动作消息）\\n/block 用户名（屏蔽）\\n/unblock 用户名（取消屏蔽）\\n密码房房主命令：/kick 用户名，/mute 用户名，/unmute 用户名\\n点消息右侧⋯：回复、表态、撤回、屏蔽"; 
  
  const typingEl = document.getElementById("typing"); 
  typingEl.addEventListener("click", () => { 
@@ -412,6 +414,24 @@
                  ws.send(JSON.stringify({type: "recall", id: mid})); 
              } 
          }, true); 
+     } 
+ 
+     if (isLockedRoom && isOwner && sender && sender !== username) { 
+         addBtn("踢出", () => { 
+             if (ws && ws.readyState === WebSocket.OPEN) { 
+                 ws.send(JSON.stringify({type: "command", cmd: "kick", user: sender})); 
+             } 
+         }, true); 
+         addBtn("禁言", () => { 
+             if (ws && ws.readyState === WebSocket.OPEN) { 
+                 ws.send(JSON.stringify({type: "command", cmd: "mute", user: sender})); 
+             } 
+         }, true); 
+         addBtn("解禁", () => { 
+             if (ws && ws.readyState === WebSocket.OPEN) { 
+                 ws.send(JSON.stringify({type: "command", cmd: "unmute", user: sender})); 
+             } 
+         }); 
      } 
  
      if (sender && sender !== username) { 
@@ -539,7 +559,8 @@
  function updateTopBar(countText, typingText) { 
      const title = "聊天室" + (isLockedRoom ? " 🔒" : "") + (countText ? (" · " + countText) : ""); 
      document.getElementById("roomTitle").innerText = title; 
-     document.getElementById("typing").innerText = typingText || helpTextShort; 
+     const ownerHint = isLockedRoom && ownerName ? (" | 房主:" + ownerName + (isOwner ? "(你)" : "")) : ""; 
+     document.getElementById("typing").innerText = typingText || (helpTextShort + ownerHint); 
      document.getElementById("exitRoom").style.display = isLockedRoom ? "" : "none"; 
  } 
  updateTopBar("", ""); 
@@ -700,11 +721,19 @@
              roomId = data.room || roomId; 
              displayRoom = data.displayRoom || displayRoom; 
              isLockedRoom = !!data.locked; 
+            ownerName = data.owner || ""; 
+            isOwner = !!data.isOwner; 
              updateTopBar(lastCountText, typingUsers.size ? (Array.from(typingUsers).slice(0,2).join("、") + " 正在输入…") : ""); 
              if (isLockedRoom) { 
                  addSystem("已进入密码房间"); 
              } 
              return; 
+         } 
+ 
+         if (data.type === "roomOwner") { 
+             ownerName = data.owner || ""; 
+             isOwner = ownerName === username; 
+             updateTopBar(lastCountText, typingUsers.size ? (Array.from(typingUsers).slice(0,2).join("、") + " 正在输入…") : ""); 
          } 
  
          if (roomId && data.room && data.room !== roomId) { 
@@ -713,6 +742,10 @@
  
          if (data.type === "count") { 
              lastCountText = "在线人数: " + data.count; 
+            if (data.owner !== undefined) { 
+                ownerName = data.owner || ""; 
+                isOwner = ownerName === username; 
+            } 
              updateTopBar(lastCountText, typingUsers.size ? (Array.from(typingUsers).slice(0,2).join("、") + " 正在输入…") : ""); 
          } 
  

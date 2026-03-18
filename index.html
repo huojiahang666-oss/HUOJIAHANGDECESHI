@@ -281,14 +281,10 @@
  const lockRequested = ["1", "true", "yes"].includes((params.get("lock") || "").toLowerCase()); 
  let roomKey = ""; 
  if (lockRequested) { 
-     roomKey = (localStorage.getItem("chat_roomkey_" + displayRoom) || "").trim(); 
+     localStorage.removeItem("chat_roomkey_" + displayRoom); 
+     roomKey = (prompt("房间密码(必填)") || "").trim(); 
      if (!roomKey) { 
-         roomKey = (prompt("房间密码(必填)") || "").trim(); 
-         if (!roomKey) { 
-             location.search = "?room=" + encodeURIComponent(displayRoom); 
-         } else { 
-             localStorage.setItem("chat_roomkey_" + displayRoom, roomKey); 
-         } 
+         location.search = "?room=lobby"; 
      } 
  } 
  
@@ -410,7 +406,7 @@
  } 
  
  function updateTopBar(countText, typingText) { 
-     const title = "聊天室 · " + displayRoom + (isLockedRoom ? " 🔒" : "") + (countText ? (" · " + countText) : ""); 
+     const title = "聊天室" + (isLockedRoom ? " 🔒" : "") + (countText ? (" · " + countText) : ""); 
      document.getElementById("roomTitle").innerText = title; 
      document.getElementById("typing").innerText = typingText || helpTextShort; 
      document.getElementById("exitRoom").style.display = isLockedRoom ? "" : "none"; 
@@ -636,6 +632,9 @@
      try { 
          if (ws) ws.close(); 
      } catch {} 
+     roomKey = ""; 
+     roomId = null; 
+     isLockedRoom = false; 
      location.search = "?room=lobby"; 
  }); 
  

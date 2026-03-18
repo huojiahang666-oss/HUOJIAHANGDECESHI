@@ -286,13 +286,31 @@
  } 
  
  /* 系统 */ 
- .system { 
-     text-align: center; 
-     color: rgba(0,0,0,0.42); 
-     font-size: 12px; 
- } 
- 
- /* 输入区 */ 
+.system { 
+    text-align: center; 
+    color: rgba(0,0,0,0.42); 
+    font-size: 12px; 
+    margin: 8px 0; 
+} 
+
+/* 加载更多 */ 
+.loadMore { 
+    text-align: center; 
+    padding: 8px 0; 
+    display: none; 
+} 
+.loadMoreBtn { 
+    background: rgba(15, 23, 42, 0.06) !important; 
+    color: var(--muted) !important; 
+    font-size: 12px !important; 
+    border-radius: 999px !important; 
+    padding: 4px 16px !important; 
+    width: auto !important; 
+    font-weight: normal !important; 
+    box-shadow: none !important; 
+} 
+
+/* 输入区 */ 
 #inputArea { 
     flex-shrink: 0; 
     margin: 0 10px; 
@@ -403,7 +421,12 @@
              <button class="topBtn" id="exitRoom" style="display:none;">退出</button> 
          </div> 
      </div> 
-     <div id="chat"></div> 
+      <div id="chat"> 
+         <div id="loadMore" class="loadMore"> 
+             <button class="loadMoreBtn" onclick="loadMoreHistory()">查看更多历史消息</button> 
+         </div> 
+         <div id="messageList"></div> 
+     </div> 
  
      <div id="extraBar"> 
          <div id="replyBar"> 
@@ -888,22 +911,43 @@ msgInput.addEventListener("focus", () => {
      }; 
  
      ws.onmessage = (e) => { 
-         const data = JSON.parse(e.data); 
- 
-         if (data.type === "roomInfo") { 
-             roomId = data.room || roomId; 
-             displayRoom = data.displayRoom || displayRoom; 
-             isLockedRoom = !!data.locked; 
-            ownerName = data.owner || ""; 
-            isOwner = !!data.isOwner; 
-             updateTopBar(lastCountText, typingUsers.size ? (Array.from(typingUsers).slice(0,2).join("、") + " 正在输入…") : ""); 
-             if (isLockedRoom) { 
-                 addSystem("已进入密码房间"); 
-             } 
-             return; 
-         } 
- 
-         if (data.type === "roomOwner") { 
+            const data = JSON.parse(e.data); 
+
+            if (data.type === "roomInfo") { 
+                roomId = data.room || roomId; 
+                displayRoom = data.displayRoom || displayRoom; 
+                isLockedRoom = !!data.locked; 
+                ownerName = data.owner || ""; 
+                isOwner = !!data.isOwner; 
+                updateTopBar(lastCountText, typingUsers.size ? (Array.from(typingUsers).slice(0,2).join("、") + " 正在输入…") : ""); 
+                if (isLockedRoom) { 
+                    addSystem("已进入密码房间"); 
+                } 
+                return; 
+            } 
+
+            if (data.type === "history") { 
+                const msgs = data.messages || []; 
+                fullHistory = msgs; 
+                document.getElementById("messageList").innerHTML = ""; 
+                
+                // 初始显示最后 4 条
+                const initialCount = 4; 
+                const start = Math.max(0, msgs.length - initialCount); 
+                const initialBatch = msgs.slice(start); 
+                
+                initialBatch.forEach(m => addMessage(m)); 
+                displayedHistoryCount = initialBatch.length; 
+                
+                if (fullHistory.length > displayedHistoryCount) { 
+                    document.getElementById("loadMore").style.display = "block"; 
+                } else { 
+                    document.getElementById("loadMore").style.display = "none"; 
+                } 
+                return; 
+            } 
+
+            if (data.type === "roomOwner") { 
              ownerName = data.owner || ""; 
              isOwner = ownerName === username; 
              updateTopBar(lastCountText, typingUsers.size ? (Array.from(typingUsers).slice(0,2).join("、") + " 正在输入…") : ""); 
@@ -1038,9 +1082,13 @@ window.addEventListener("resize", updateHeight);
  
  setTimeout(updateHeight, 300); 
  
- /* 添加消息 */ 
-function addMessage(data) { 
+let fullHistory = []; 
+let displayedHistoryCount = 0; 
+
+/* 添加消息 */ 
+function addMessage(data, prepend = false) { 
     const chat = document.getElementById("chat"); 
+    const list = document.getElementById("messageList"); 
     const isPm = data.type === "pm"; 
     const isImage = data.type === "image"; 
     const sender = isPm ? data.from : data.user; 
@@ -1052,7 +1100,7 @@ function addMessage(data) {
 
     const text = data.recalled ? "" : (data.text || ""); 
     const mentionMe = !isMe && text && (text.includes("@" + username) || text.includes("@all")); 
-    if (!isMe) { 
+    if (!isMe && !prepend) { 
         notifyIncoming(sender, isImage ? "[图片]" : text, isPm, mentionMe || isPm); 
     } 
 
@@ -1132,82 +1180,109 @@ function addMessage(data) {
     } else { 
         bubble.innerText = (data.type === "me" ? (sender + " " + text) : text); 
     } 
- 
-     const time = document.createElement("div"); 
-     time.className = "time"; 
-     time.innerText = data.time; 
- 
-     msg.appendChild(name); 
-     msg.appendChild(bubble); 
-     msg.appendChild(time); 
- 
-     const reactionsEl = document.createElement("div"); 
-     reactionsEl.className = "reactions"; 
-     msg.appendChild(reactionsEl); 
-     renderReactions(mid); 
- 
-     msg.addEventListener("contextmenu", (ev) => { 
-         ev.preventDefault(); 
+
+    const time = document.createElement("div"); 
+    time.className = "time"; 
+    time.innerText = data.time; 
+
+    msg.appendChild(name); 
+    msg.appendChild(bubble); 
+    msg.appendChild(time); 
+
+    const reactionsEl = document.createElement("div"); 
+    reactionsEl.className = "reactions"; 
+    msg.appendChild(reactionsEl); 
+    renderReactions(mid); 
+
+    msg.addEventListener("contextmenu", (ev) => { 
+        ev.preventDefault(); 
         showActionSheet(mid); 
-     }); 
- 
-     chat.appendChild(msg); 
-     scrollBottom(); 
-     applySearchFilter(); 
- } 
- 
- function renderReactions(mid) { 
-     const el = messageEls.get(mid); 
-     const d = messageData.get(mid); 
-     if (!el || !d) return; 
-     const reactionsEl = el.querySelector(".reactions"); 
-     if (!reactionsEl) return; 
-     reactionsEl.innerHTML = ""; 
-     const r = d.reactions; 
-     if (!r || typeof r !== "object") return; 
-     for (const [emoji, count] of Object.entries(r)) { 
-         if (!count) continue; 
-         const chip = document.createElement("div"); 
-         chip.className = "reaction"; 
-         chip.innerText = emoji + " " + count; 
-         reactionsEl.appendChild(chip); 
-     } 
- } 
- 
- function applyReaction(data) { 
-     const mid = data.id; 
-     if (!mid) return; 
-     const d = messageData.get(mid); 
-     if (!d) return; 
-     d.reactions = d.reactions || {}; 
-     d.reactions[data.emoji] = data.count; 
-     renderReactions(mid); 
- } 
- 
- function applyRecall(data) { 
-     const mid = data.id; 
-     if (!mid) return; 
-     const d = messageData.get(mid); 
-     const el = messageEls.get(mid); 
-     if (!d || !el) return; 
-     d.recalled = true; 
-     d.text = ""; 
-     const bubble = el.querySelector(".bubble"); 
-     if (bubble) bubble.innerText = "已撤回"; 
- } 
- 
+    }); 
+
+    if (prepend) { 
+        list.prepend(msg); 
+    } else { 
+        list.appendChild(msg); 
+        scrollBottom(); 
+    } 
+    applySearchFilter(); 
+} 
+
+function loadMoreHistory() { 
+    const chat = document.getElementById("chat"); 
+    const oldHeight = chat.scrollHeight; 
+    
+    const remaining = fullHistory.length - displayedHistoryCount; 
+    const batchSize = 10; 
+    const toLoad = fullHistory.slice(Math.max(0, remaining - batchSize), remaining); 
+    
+    for (let i = toLoad.length - 1; i >= 0; i--) { 
+        addMessage(toLoad[i], true); 
+    } 
+    
+    displayedHistoryCount += toLoad.length; 
+    
+    if (displayedHistoryCount >= fullHistory.length) { 
+        document.getElementById("loadMore").style.display = "none"; 
+    } 
+    
+    requestAnimationFrame(() => { 
+        chat.scrollTop = chat.scrollHeight - oldHeight; 
+    }); 
+} 
+
+function renderReactions(mid) { 
+    const el = messageEls.get(mid); 
+    const d = messageData.get(mid); 
+    if (!el || !d) return; 
+    const reactionsEl = el.querySelector(".reactions"); 
+    if (!reactionsEl) return; 
+    reactionsEl.innerHTML = ""; 
+    const r = d.reactions; 
+    if (!r || typeof r !== "object") return; 
+    for (const [emoji, count] of Object.entries(r)) { 
+        if (!count) continue; 
+        const chip = document.createElement("div"); 
+        chip.className = "reaction"; 
+        chip.innerText = emoji + " " + count; 
+        reactionsEl.appendChild(chip); 
+    } 
+} 
+
+function applyReaction(data) { 
+    const mid = data.id; 
+    if (!mid) return; 
+    const d = messageData.get(mid); 
+    if (!d) return; 
+    d.reactions = d.reactions || {}; 
+    d.reactions[data.emoji] = data.count; 
+    renderReactions(mid); 
+} 
+
+function applyRecall(data) { 
+    const mid = data.id; 
+    if (!mid) return; 
+    const d = messageData.get(mid); 
+    const el = messageEls.get(mid); 
+    if (!d || !el) return; 
+    d.recalled = true; 
+    d.text = ""; 
+    const bubble = el.querySelector(".bubble"); 
+    if (bubble) bubble.innerText = "已撤回"; 
+} 
+
 function openMessageActions(mid) { 
     showActionSheet(mid); 
 } 
- 
- /* 系统消息 */ 
- function addSystem(text) { 
-     const chat = document.getElementById("chat"); 
-     const div = document.createElement("div"); 
-     div.className = "system"; 
-     div.innerText = text; 
-     chat.appendChild(div); 
- } 
+
+/* 系统消息 */ 
+function addSystem(text) { 
+    const list = document.getElementById("messageList"); 
+    const div = document.createElement("div"); 
+    div.className = "system"; 
+    div.innerText = text; 
+    list.appendChild(div); 
+} 
  
  /* 发送 */ 
  function send() { 

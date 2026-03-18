@@ -236,12 +236,14 @@
 } 
 
 .bubble img { 
-    max-width: 100%; 
-    border-radius: 8px; 
-    display: block; 
-    margin-top: 4px; 
-    cursor: zoom-in; 
-} 
+     max-width: 100%; 
+     max-height: 300px; 
+     border-radius: 8px; 
+     display: block; 
+     margin-top: 4px; 
+     cursor: zoom-in; 
+     object-fit: cover; 
+ } 
  
  .left .bubble { background: rgba(255,255,255,0.96); color: rgba(15, 23, 42, 0.92); } 
  .right .bubble { background: linear-gradient(135deg, rgba(59,130,246,0.96), rgba(34,197,94,0.88)); color: rgba(255,255,255,0.96); border: 0; } 
@@ -567,29 +569,59 @@ imageToggle.addEventListener("click", () => imageInput.click());
 imageInput.addEventListener("change", (e) => { 
     const file = e.target.files[0]; 
     if (!file) return; 
-    if (file.size > 2 * 1024 * 1024) { 
-        alert("图片不能超过 2MB"); 
-        imageInput.value = ""; 
-        return; 
-    } 
+    
+    // 图片压缩处理
     const reader = new FileReader(); 
     reader.onload = (ev) => { 
-        if (!ws || ws.readyState !== WebSocket.OPEN) { 
-            addSystem("未连接，稍后再试"); 
-            return; 
-        } 
-        try { 
-             ws.send(JSON.stringify({ 
-                 type: "image", 
-                 image: ev.target.result, 
-                 replyTo: replyToId || undefined 
-             })); 
-             clearReply(); 
-             addSystem("图片正在发送中..."); 
-         } catch (err) { 
-             console.error(err); 
-             addSystem("图片发送失败: " + err.message); 
-         } 
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement("canvas");
+            let width = img.width;
+            let height = img.height;
+            
+            // 设定最大尺寸限制
+            const MAX_WIDTH = 1200;
+            const MAX_HEIGHT = 1200;
+            
+            if (width > height) {
+                if (width > MAX_WIDTH) {
+                    height *= MAX_WIDTH / width;
+                    width = MAX_WIDTH;
+                }
+            } else {
+                if (height > MAX_HEIGHT) {
+                    width *= MAX_HEIGHT / height;
+                    height = MAX_HEIGHT;
+                }
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            // 导出压缩后的图片 (质量 0.7)
+            const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
+            
+            if (!ws || ws.readyState !== WebSocket.OPEN) { 
+                addSystem("未连接，稍后再试"); 
+                return; 
+            } 
+            
+            try { 
+                 ws.send(JSON.stringify({ 
+                     type: "image", 
+                     image: compressedBase64, 
+                     replyTo: replyToId || undefined 
+                 })); 
+                 clearReply(); 
+                 addSystem("图片已压缩并发送"); 
+             } catch (err) { 
+                 console.error(err); 
+                 addSystem("图片发送失败: " + err.message); 
+             } 
+        };
+        img.src = ev.target.result;
     }; 
     reader.onerror = () => { 
         addSystem("读取图片失败"); 

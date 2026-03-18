@@ -416,10 +416,11 @@
              <div id="typing"></div> 
          </div> 
          <div id="topRight"> 
-             <input id="searchInput" placeholder="搜索" style="display:none;"> 
-             <button class="topBtn" id="searchToggle">搜索</button> 
-             <button class="topBtn" id="exitRoom" style="display:none;">退出</button> 
-         </div> 
+            <input id="searchInput" placeholder="搜索" style="display:none;"> 
+            <button class="topBtn" id="searchToggle">搜索</button> 
+            <button class="topBtn" id="clearChat">清屏</button> 
+            <button class="topBtn" id="exitRoom" style="display:none;">退出</button> 
+        </div> 
      </div> 
       <div id="chat"> 
          <div id="loadMore" class="loadMore"> 
@@ -1041,7 +1042,17 @@ msgInput.addEventListener("focus", () => {
  } 
  connect(); 
  
- document.getElementById("exitRoom").addEventListener("click", () => { 
+ document.getElementById("clearChat").addEventListener("click", () => {
+    if (confirm("确定要清空当前的聊天记录吗？(仅本地清屏)")) {
+        document.getElementById("messageList").innerHTML = "";
+        document.getElementById("loadMore").style.display = "none";
+        messageEls.clear();
+        messageData.clear();
+        addSystem("本地聊天记录已清屏");
+    }
+});
+
+document.getElementById("exitRoom").addEventListener("click", () => { 
      shouldReconnect = false; 
      try { 
          if (ws) ws.close(); 

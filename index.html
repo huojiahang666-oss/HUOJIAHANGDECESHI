@@ -874,57 +874,6 @@
         showActionSheet(mid); 
      }); 
  
-     let pressTimer = null; 
-     let pressX = 0; 
-     let pressY = 0; 
-     let longPressed = false; 
-     let lastTapAt = 0; 
-     msg.addEventListener("pointerdown", (ev) => { 
-         if (ev.pointerType !== "touch") return; 
-         pressX = ev.clientX; 
-         pressY = ev.clientY; 
-         longPressed = false; 
-         if (pressTimer) { 
-             clearTimeout(pressTimer); 
-             pressTimer = null; 
-         } 
-         pressTimer = setTimeout(() => { 
-             pressTimer = null; 
-             longPressed = true; 
-             showActionSheet(mid); 
-         }, 450); 
-     }); 
-     msg.addEventListener("pointermove", (ev) => { 
-         if (!pressTimer) return; 
-         if (Math.abs(ev.clientX - pressX) > 12 || Math.abs(ev.clientY - pressY) > 12) { 
-             clearTimeout(pressTimer); 
-             pressTimer = null; 
-         } 
-     }); 
-     msg.addEventListener("pointerup", () => { 
-         if (pressTimer) { 
-             clearTimeout(pressTimer); 
-             pressTimer = null; 
-         } 
-         if (longPressed) { 
-             longPressed = false; 
-             return; 
-         } 
-         const now = Date.now(); 
-         if (now - lastTapAt < 300) { 
-             lastTapAt = 0; 
-             showActionSheet(mid); 
-         } else { 
-             lastTapAt = now; 
-         } 
-     }); 
-     msg.addEventListener("pointercancel", () => { 
-         if (pressTimer) { 
-             clearTimeout(pressTimer); 
-             pressTimer = null; 
-         } 
-     }); 
- 
      chat.appendChild(msg); 
      scrollBottom(); 
      applySearchFilter(); 

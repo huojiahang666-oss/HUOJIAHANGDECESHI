@@ -13,12 +13,13 @@ body {
     height: 100vh;
 }
 
-/* 左侧用户 */
+/* 左侧用户栏 */
 #sidebar {
-    width: 80px;
+    width: 60px;
     background: #2c3e50;
     color: white;
     overflow-y: auto;
+    transition: transform 0.3s;
 }
 
 .user {
@@ -28,10 +29,31 @@ body {
 }
 
 .avatar {
-    width: 40px;
-    height: 40px;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
     margin: auto;
+}
+
+/* 📱 手机端隐藏侧边栏 */
+@media (max-width: 600px) {
+    #sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        height: 100%;
+        width: 200px;
+        z-index: 1000;
+        transform: translateX(-100%);
+    }
+
+    #sidebar.show {
+        transform: translateX(0);
+    }
+
+    #inputArea {
+        width: 100% !important;
+    }
 }
 
 /* 主区域 */
@@ -89,7 +111,7 @@ body {
     color: gray;
 }
 
-/* 系统 */
+/* 系统消息 */
 .system {
     text-align: center;
     color: gray;
@@ -99,7 +121,7 @@ body {
 #inputArea {
     position: fixed;
     bottom: 0;
-    width: calc(100% - 80px);
+    width: calc(100% - 60px);
     height: 60px;
     display: flex;
     background: white;
@@ -112,6 +134,7 @@ body {
     border: none;
     padding: 10px;
     font-size: 16px;
+    outline: none;
 }
 
 button {
@@ -128,7 +151,11 @@ button {
 <div id="sidebar"></div>
 
 <div id="main">
-    <div id="topBar">聊天室</div>
+    <div id="topBar">
+        <button onclick="toggleSidebar()">☰</button>
+        <span style="margin-left:10px;">聊天室</span>
+    </div>
+
     <div id="chat"></div>
 
     <div id="inputArea">
@@ -141,13 +168,20 @@ button {
 const username = prompt("用户名") || "匿名";
 const ws = new WebSocket("wss://ducally-chemiluminescent-zenaida.ngrok-free.dev");
 
+/* ✅ 侧边栏开关 */
+function toggleSidebar() {
+    document.getElementById("sidebar").classList.toggle("show");
+}
+
 /* ✅ 终极防遮挡 */
 function updateHeight() {
     const chat = document.getElementById("chat");
     const inputH = document.getElementById("inputArea").offsetHeight;
     const topH = document.getElementById("topBar").offsetHeight;
 
-    const viewH = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const viewH = window.visualViewport 
+        ? window.visualViewport.height 
+        : window.innerHeight;
 
     chat.style.height = (viewH - inputH - topH) + "px";
 }
@@ -202,7 +236,7 @@ ws.onmessage = (e) => {
     }
 };
 
-/* 随机颜色头像 */
+/* 头像颜色 */
 function getColor(name) {
     const colors = ["#f44336","#2196f3","#4caf50","#ff9800","#9c27b0"];
     return colors[name.length % colors.length];
@@ -255,6 +289,11 @@ function send() {
     input.value = "";
 }
 
+/* 回车发送 */
+document.getElementById("msg").addEventListener("keypress", e=>{
+    if(e.key==="Enter") send();
+});
+
 /* 滚动 */
 function scrollBottom() {
     const chat = document.getElementById("chat");
@@ -262,11 +301,6 @@ function scrollBottom() {
         chat.scrollTop = chat.scrollHeight;
     }, 50);
 }
-
-/* 回车 */
-document.getElementById("msg").addEventListener("keypress", e=>{
-    if(e.key==="Enter") send();
-});
 </script>
 
 </body>

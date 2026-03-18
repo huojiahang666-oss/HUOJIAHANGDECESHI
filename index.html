@@ -928,22 +928,34 @@ msgInput.addEventListener("focus", () => {
 
             if (data.type === "history") { 
                 const msgs = data.messages || []; 
-                fullHistory = msgs; 
                 document.getElementById("messageList").innerHTML = ""; 
+                msgs.forEach(m => addMessage(m)); 
                 
-                // 初始显示最后 4 条
-                const initialCount = 4; 
-                const start = Math.max(0, msgs.length - initialCount); 
-                const initialBatch = msgs.slice(start); 
-                
-                initialBatch.forEach(m => addMessage(m)); 
-                displayedHistoryCount = initialBatch.length; 
-                
-                if (fullHistory.length > displayedHistoryCount) { 
+                if (data.hasMore) { 
                     document.getElementById("loadMore").style.display = "block"; 
                 } else { 
                     document.getElementById("loadMore").style.display = "none"; 
                 } 
+                return; 
+            } 
+
+            if (data.type === "history_batch") { 
+                const msgs = data.messages || []; 
+                const chat = document.getElementById("chat"); 
+                const oldHeight = chat.scrollHeight; 
+                
+                // 反向循环以保持正确顺序（因为是 prepend）
+                for (let i = msgs.length - 1; i >= 0; i--) { 
+                    addMessage(msgs[i], true); 
+                } 
+                
+                if (!data.hasMore) { 
+                    document.getElementById("loadMore").style.display = "none"; 
+                } 
+                
+                requestAnimationFrame(() => { 
+                    chat.scrollTop = chat.scrollHeight - oldHeight; 
+                }); 
                 return; 
             } 
 
@@ -1082,9 +1094,6 @@ window.addEventListener("resize", updateHeight);
  
  setTimeout(updateHeight, 300); 
  
-let fullHistory = []; 
-let displayedHistoryCount = 0; 
-
 /* 添加消息 */ 
 function addMessage(data, prepend = false) { 
     const chat = document.getElementById("chat"); 
@@ -1209,26 +1218,16 @@ function addMessage(data, prepend = false) {
 } 
 
 function loadMoreHistory() { 
-    const chat = document.getElementById("chat"); 
-    const oldHeight = chat.scrollHeight; 
+    const firstMsg = document.querySelector("#messageList .message");
+    if (!firstMsg) return;
+    const firstId = firstMsg.dataset.id;
     
-    const remaining = fullHistory.length - displayedHistoryCount; 
-    const batchSize = 10; 
-    const toLoad = fullHistory.slice(Math.max(0, remaining - batchSize), remaining); 
-    
-    for (let i = toLoad.length - 1; i >= 0; i--) { 
-        addMessage(toLoad[i], true); 
-    } 
-    
-    displayedHistoryCount += toLoad.length; 
-    
-    if (displayedHistoryCount >= fullHistory.length) { 
-        document.getElementById("loadMore").style.display = "none"; 
-    } 
-    
-    requestAnimationFrame(() => { 
-        chat.scrollTop = chat.scrollHeight - oldHeight; 
-    }); 
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+            type: "get_history",
+            beforeId: firstId
+        }));
+    }
 } 
 
 function renderReactions(mid) { 

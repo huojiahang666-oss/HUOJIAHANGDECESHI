@@ -1,333 +1,168 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>聊天室</title>
-
 <style>
-body {
+  body, html {
     margin: 0;
-    font-family: Arial;
-    display: flex;
-    height: 100vh;
-}
-
-/* 左侧用户栏 */
-#sidebar {
-    width: 60px;
-    background: #2c3e50;
-    color: white;
-    overflow-y: auto;
-    transition: transform 0.3s;
-}
-
-.user {
-    text-align: center;
-    padding: 10px;
-    border-bottom: 1px solid #444;
-}
-
-.avatar {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    margin: auto;
-}
-
-/* 📱 手机端 */
-@media (max-width: 600px) {
-    #sidebar {
-        position: fixed;
-        left: 0;
-        top: 0;
-        height: 100%;
-        width: 200px;
-        z-index: 1000;
-        transform: translateX(-100%);
-    }
-
-    #sidebar.show {
-        transform: translateX(0);
-    }
-
-    #inputArea {
-        width: 100% !important;
-    }
-}
-
-/* 遮罩 */
-#mask {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0,0,0,0.3);
-    display: none;
-    z-index: 999;
-}
-
-#mask.show {
-    display: block;
-}
-
-/* 主区域 */
-#main {
-    flex: 1;
+    padding: 0;
+    height: 100%;
+    font-family: sans-serif;
     display: flex;
     flex-direction: column;
-}
-
-/* 顶部 */
-#topBar {
-    height: 40px;
-    background: #4caf50;
-    color: white;
+  }
+  #chat-container {
     display: flex;
-    align-items: center;
-    padding: 0 10px;
-}
-
-#topBar button {
-    width: 40px;
-    margin-right: 10px;
-}
-
-/* 聊天区 */
-#chat {
-    overflow-y: auto;
-    padding: 10px;
+    flex: 1;
+    overflow: hidden;
+  }
+  #user-list {
+    width: 150px;
+    background: #f1f1f1;
+    border-right: 1px solid #ccc;
+    padding: 5px;
     box-sizing: border-box;
-}
-
-/* 消息 */
-.message {
+    overflow-y: auto;
+  }
+  #messages-container {
+    flex: 1;
     display: flex;
     flex-direction: column;
-    margin: 10px 0;
-}
-
-.left { align-items: flex-start; }
-.right { align-items: flex-end; }
-
-.username {
-    font-size: 12px;
-    color: gray;
-}
-
-.bubble {
-    padding: 10px;
-    border-radius: 10px;
-    max-width: 70%;
-    margin-top: 2px;
-    word-break: break-word;
-}
-
-.left .bubble { background: #eee; }
-.right .bubble { background: #4caf50; color: white; }
-
-.time {
-    font-size: 10px;
-    color: gray;
-}
-
-/* 系统 */
-.system {
-    text-align: center;
-    color: gray;
-}
-
-/* 输入区 */
-#inputArea {
-    position: fixed;
-    bottom: 0;
-    width: calc(100% - 60px);
-    height: 60px;
-    display: flex;
-    background: white;
-    border-top: 1px solid #ccc;
-    padding-bottom: env(safe-area-inset-bottom);
-}
-
-#msg {
+    overflow: hidden;
+    position: relative;
+  }
+  #messages {
     flex: 1;
-    border: none;
     padding: 10px;
-    font-size: 16px;
-    outline: none;
-}
+    overflow-y: auto;
+    box-sizing: border-box;
+  }
+  .message {
+    margin-bottom: 10px;
+    max-width: 80%;
+    word-wrap: break-word;
+  }
+  .message .meta {
+    font-size: 0.8em;
+    color: #666;
+  }
+  .message.self {
+    align-self: flex-end;
+    background: #d1ffd6;
+    padding: 5px 10px;
+    border-radius: 10px 0 10px 10px;
+  }
+  .message.other {
+    align-self: flex-start;
+    background: #fff;
+    padding: 5px 10px;
+    border-radius: 0 10px 10px 10px;
+    border: 1px solid #ccc;
+  }
+  #input-container {
+    display: flex;
+    padding: 5px;
+    border-top: 1px solid #ccc;
+    background: #fafafa;
+  }
+  #input-field {
+    flex: 1;
+    padding: 5px 10px;
+    font-size: 1em;
+  }
+  #send-btn {
+    padding: 5px 15px;
+    margin-left: 5px;
+    font-size: 1em;
+  }
 
-button {
-    border: none;
-    background: #4caf50;
-    color: white;
-}
+  /* 手机竖屏隐藏用户列表 */
+  @media (max-width: 600px) {
+    #user-list {
+      display: none;
+    }
+  }
 </style>
 </head>
-
 <body>
 
-<div id="sidebar"></div>
-<div id="mask" onclick="closeSidebar()"></div>
-
-<div id="main">
-    <div id="topBar">
-        <button onclick="toggleSidebar()">☰</button>
-        <span>聊天室</span>
+<div id="chat-container">
+  <div id="user-list">
+    <h4>在线用户</h4>
+    <ul id="users"></ul>
+  </div>
+  <div id="messages-container">
+    <div id="messages"></div>
+    <div id="input-container">
+      <input type="text" id="input-field" placeholder="输入消息...">
+      <button id="send-btn">发送</button>
     </div>
-
-    <div id="chat"></div>
-
-    <div id="inputArea">
-        <input id="msg" placeholder="输入消息...">
-        <button onclick="send()">发送</button>
-    </div>
+  </div>
 </div>
 
 <script>
-const username = prompt("用户名") || "匿名";
-const ws = new WebSocket("wss://ducally-chemiluminescent-zenaida.ngrok-free.dev");
+const WS_URL = "wss://ducally-chemiluminescent-zenaida.ngrok-free.dev";
+let username = prompt("请输入用户名:", "匿名");
+if(!username) username = "匿名";
 
-/* ✅ 侧边栏控制 */
-function toggleSidebar() {
-    document.getElementById("sidebar").classList.toggle("show");
-    document.getElementById("mask").classList.toggle("show");
+const ws = new WebSocket(WS_URL);
+
+const messagesDiv = document.getElementById("messages");
+const usersUl = document.getElementById("users");
+const inputField = document.getElementById("input-field");
+const sendBtn = document.getElementById("send-btn");
+
+function addMessage(sender, text, self=false) {
+  const msgDiv = document.createElement("div");
+  msgDiv.className = 'message ' + (self ? 'self' : 'other');
+  const meta = document.createElement("div");
+  meta.className = 'meta';
+  meta.textContent = sender + ' ' + new Date().toLocaleTimeString();
+  const content = document.createElement("div");
+  content.textContent = text;
+  msgDiv.appendChild(meta);
+  msgDiv.appendChild(content);
+  messagesDiv.appendChild(msgDiv);
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
-function closeSidebar() {
-    document.getElementById("sidebar").classList.remove("show");
-    document.getElementById("mask").classList.remove("show");
+function updateUsers(userList) {
+  usersUl.innerHTML = '';
+  userList.forEach(u => {
+    const li = document.createElement('li');
+    li.textContent = u;
+    usersUl.appendChild(li);
+  });
 }
 
-/* ✅ 防遮挡 */
-function updateHeight() {
-    const chat = document.getElementById("chat");
-    const inputH = document.getElementById("inputArea").offsetHeight;
-    const topH = document.getElementById("topBar").offsetHeight;
-
-    const viewH = window.visualViewport 
-        ? window.visualViewport.height 
-        : window.innerHeight;
-
-    chat.style.height = (viewH - inputH - topH) + "px";
-}
-
-if (window.visualViewport) {
-    window.visualViewport.addEventListener("resize", updateHeight);
-}
-window.addEventListener("resize", updateHeight);
-document.addEventListener("focusin", () => setTimeout(updateHeight, 300));
-
-setTimeout(updateHeight, 300);
-
-/* WebSocket */
 ws.onopen = () => {
-    ws.send(JSON.stringify({user: username}));
+  ws.send(JSON.stringify({type: "join", username}));
 };
 
-ws.onmessage = (e) => {
-    const data = JSON.parse(e.data);
-
-    if (data.type === "users") {
-        const sidebar = document.getElementById("sidebar");
-        sidebar.innerHTML = "";
-
-        data.users.forEach(u => {
-            const div = document.createElement("div");
-            div.className = "user";
-
-            const avatar = document.createElement("div");
-            avatar.className = "avatar";
-            avatar.style.background = getColor(u);
-
-            const name = document.createElement("div");
-            name.innerText = u;
-
-            div.appendChild(avatar);
-            div.appendChild(name);
-            sidebar.appendChild(div);
-        });
-    }
-
-    if (data.type === "count") {
-        document.getElementById("topBar").innerText = "在线人数: " + data.count;
-    }
-
-    if (data.type === "system") {
-        addSystem(data.text);
-    }
-
-    if (data.type === "chat") {
-        addMessage(data);
-    }
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  if(data.type === "message") {
+    addMessage(data.username, data.text, data.username === username);
+  } else if(data.type === "users") {
+    updateUsers(data.users);
+  } else if(data.type === "system") {
+    addMessage("系统", data.text, false);
+  }
 };
 
-/* 头像颜色 */
-function getColor(name) {
-    const colors = ["#f44336","#2196f3","#4caf50","#ff9800","#9c27b0"];
-    return colors[name.length % colors.length];
-}
+sendBtn.onclick = () => {
+  const msg = inputField.value.trim();
+  if(msg) {
+    ws.send(JSON.stringify({type: "message", username, text: msg}));
+    inputField.value = '';
+  }
+};
 
-/* 消息 */
-function addMessage(data) {
-    const chat = document.getElementById("chat");
-    const isMe = data.user === username;
-
-    const msg = document.createElement("div");
-    msg.className = "message " + (isMe ? "right" : "left");
-
-    const name = document.createElement("div");
-    name.className = "username";
-    name.innerText = data.user;
-
-    const bubble = document.createElement("div");
-    bubble.className = "bubble";
-    bubble.innerText = data.text;
-
-    const time = document.createElement("div");
-    time.className = "time";
-    time.innerText = data.time;
-
-    msg.appendChild(name);
-    msg.appendChild(bubble);
-    msg.appendChild(time);
-
-    chat.appendChild(msg);
-    scrollBottom();
-}
-
-/* 系统消息 */
-function addSystem(text) {
-    const chat = document.getElementById("chat");
-    const div = document.createElement("div");
-    div.className = "system";
-    div.innerText = text;
-    chat.appendChild(div);
-}
-
-/* 发送 */
-function send() {
-    const input = document.getElementById("msg");
-    const text = input.value.trim();
-    if (!text) return;
-
-    ws.send(JSON.stringify({text: text}));
-    input.value = "";
-}
-
-/* 回车 */
-document.getElementById("msg").addEventListener("keypress", e=>{
-    if(e.key==="Enter") send();
+inputField.addEventListener("keypress", (e) => {
+  if(e.key === "Enter") sendBtn.click();
 });
-
-/* 滚动 */
-function scrollBottom() {
-    const chat = document.getElementById("chat");
-    setTimeout(() => {
-        chat.scrollTop = chat.scrollHeight;
-    }, 50);
-}
 </script>
 
 </body>

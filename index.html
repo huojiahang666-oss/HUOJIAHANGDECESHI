@@ -13,13 +13,12 @@ body {
     height: 100vh;
 }
 
-/* 左侧用户栏 */
+/* 左侧用户 */
 #sidebar {
-    width: 60px;
+    width: 80px;
     background: #2c3e50;
     color: white;
     overflow-y: auto;
-    transition: transform 0.3s;
 }
 
 .user {
@@ -29,47 +28,10 @@ body {
 }
 
 .avatar {
-    width: 30px;
-    height: 30px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     margin: auto;
-}
-
-/* 📱 手机端 */
-@media (max-width: 600px) {
-    #sidebar {
-        position: fixed;
-        left: 0;
-        top: 0;
-        height: 100%;
-        width: 200px;
-        z-index: 1000;
-        transform: translateX(-100%);
-    }
-
-    #sidebar.show {
-        transform: translateX(0);
-    }
-
-    #inputArea {
-        width: 100% !important;
-    }
-}
-
-/* 遮罩 */
-#mask {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0,0,0,0.3);
-    display: none;
-    z-index: 999;
-}
-
-#mask.show {
-    display: block;
 }
 
 /* 主区域 */
@@ -87,11 +49,6 @@ body {
     display: flex;
     align-items: center;
     padding: 0 10px;
-}
-
-#topBar button {
-    width: 40px;
-    margin-right: 10px;
 }
 
 /* 聊天区 */
@@ -142,7 +99,7 @@ body {
 #inputArea {
     position: fixed;
     bottom: 0;
-    width: calc(100% - 60px);
+    width: calc(100% - 80px);
     height: 60px;
     display: flex;
     background: white;
@@ -155,10 +112,10 @@ body {
     border: none;
     padding: 10px;
     font-size: 16px;
-    outline: none;
 }
 
 button {
+    width: 80px;
     border: none;
     background: #4caf50;
     color: white;
@@ -169,14 +126,9 @@ button {
 <body>
 
 <div id="sidebar"></div>
-<div id="mask" onclick="closeSidebar()"></div>
 
 <div id="main">
-    <div id="topBar">
-        <button onclick="toggleSidebar()">☰</button>
-        <span>聊天室</span>
-    </div>
-
+    <div id="topBar">聊天室</div>
     <div id="chat"></div>
 
     <div id="inputArea">
@@ -189,26 +141,13 @@ button {
 const username = prompt("用户名") || "匿名";
 const ws = new WebSocket("wss://ducally-chemiluminescent-zenaida.ngrok-free.dev");
 
-/* ✅ 侧边栏控制 */
-function toggleSidebar() {
-    document.getElementById("sidebar").classList.toggle("show");
-    document.getElementById("mask").classList.toggle("show");
-}
-
-function closeSidebar() {
-    document.getElementById("sidebar").classList.remove("show");
-    document.getElementById("mask").classList.remove("show");
-}
-
-/* ✅ 防遮挡 */
+/* ✅ 终极防遮挡 */
 function updateHeight() {
     const chat = document.getElementById("chat");
     const inputH = document.getElementById("inputArea").offsetHeight;
     const topH = document.getElementById("topBar").offsetHeight;
 
-    const viewH = window.visualViewport 
-        ? window.visualViewport.height 
-        : window.innerHeight;
+    const viewH = window.visualViewport ? window.visualViewport.height : window.innerHeight;
 
     chat.style.height = (viewH - inputH - topH) + "px";
 }
@@ -263,13 +202,13 @@ ws.onmessage = (e) => {
     }
 };
 
-/* 头像颜色 */
+/* 随机颜色头像 */
 function getColor(name) {
     const colors = ["#f44336","#2196f3","#4caf50","#ff9800","#9c27b0"];
     return colors[name.length % colors.length];
 }
 
-/* 消息 */
+/* 添加消息 */
 function addMessage(data) {
     const chat = document.getElementById("chat");
     const isMe = data.user === username;
@@ -316,11 +255,6 @@ function send() {
     input.value = "";
 }
 
-/* 回车 */
-document.getElementById("msg").addEventListener("keypress", e=>{
-    if(e.key==="Enter") send();
-});
-
 /* 滚动 */
 function scrollBottom() {
     const chat = document.getElementById("chat");
@@ -328,6 +262,11 @@ function scrollBottom() {
         chat.scrollTop = chat.scrollHeight;
     }, 50);
 }
+
+/* 回车 */
+document.getElementById("msg").addEventListener("keypress", e=>{
+    if(e.key==="Enter") send();
+});
 </script>
 
 </body>

@@ -39,6 +39,10 @@
  
  /* 主区域 */ 
 #main { 
+    position: fixed; 
+    top: 0; 
+    left: 0; 
+    right: 0; 
     display: flex; 
     flex-direction: column; 
     width: 100%; 
@@ -776,12 +780,20 @@
      }, 900); 
  }); 
  msgInput.addEventListener("blur", () => { 
-     if (typingTimer) clearTimeout(typingTimer); 
-     if (typingSent) { 
-         typingSent = false; 
-         sendTyping(false); 
-     } 
- }); 
+    if (typingTimer) clearTimeout(typingTimer); 
+    if (typingSent) { 
+        typingSent = false; 
+        sendTyping(false); 
+    } 
+    // 强制重置滚动，防止键盘收起后页面留白 
+    window.scrollTo(0, 0); 
+    setTimeout(updateHeight, 100); 
+}); 
+msgInput.addEventListener("focus", () => { 
+    // 强制重置滚动 
+    window.scrollTo(0, 0); 
+    setTimeout(updateHeight, 100); 
+}); 
  
  let ws; 
  let shouldReconnect = true; 
@@ -904,21 +916,30 @@ function updateHeight() {
     const main = document.getElementById("main"); 
     const wasNearBottom = (chat.scrollHeight - chat.scrollTop - chat.clientHeight) < 60; 
 
-    // 获取当前视觉视口高度，适配移动端键盘 
-    const viewH = window.visualViewport ? window.visualViewport.height : window.innerHeight; 
-    
-    // 动态调整主容器高度 
-    main.style.height = viewH + "px"; 
+    if (window.visualViewport) { 
+        // 关键：将主容器同步到视觉视口的高度和偏移量 
+        const { height, offsetTop } = window.visualViewport; 
+        main.style.height = height + "px"; 
+        main.style.top = offsetTop + "px"; 
+        
+        // 强制重置全局滚动，防止 iOS 将页面整体顶上去 
+        if (offsetTop > 0) { 
+            window.scrollTo(0, 0); 
+        } 
+    } else { 
+        main.style.height = window.innerHeight + "px"; 
+    } 
 
     if (wasNearBottom) { 
         setTimeout(scrollBottom, 0); 
     } 
 } 
- 
- if (window.visualViewport) { 
-     window.visualViewport.addEventListener("resize", updateHeight); 
- } 
- window.addEventListener("resize", updateHeight); 
+
+if (window.visualViewport) { 
+    window.visualViewport.addEventListener("resize", updateHeight); 
+    window.visualViewport.addEventListener("scroll", updateHeight); 
+} 
+window.addEventListener("resize", updateHeight); 
  if (!window.visualViewport) { 
      document.addEventListener("focusin", () => setTimeout(updateHeight, 300)); 
  } 

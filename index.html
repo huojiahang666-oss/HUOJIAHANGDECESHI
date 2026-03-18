@@ -226,14 +226,22 @@
  } 
  
  .bubble { 
-     padding: 10px 12px; 
-     border-radius: 14px; 
-     max-width: 70%; 
-     margin-top: 4px; 
-     word-break: break-word; 
-     border: 1px solid rgba(15, 23, 42, 0.08); 
-     box-shadow: 0 8px 18px rgba(2, 6, 23, 0.08); 
- } 
+    padding: 10px 12px; 
+    border-radius: 14px; 
+    max-width: 70%; 
+    margin-top: 4px; 
+    word-break: break-word; 
+    border: 1px solid rgba(15, 23, 42, 0.08); 
+    box-shadow: 0 8px 18px rgba(2, 6, 23, 0.08); 
+} 
+
+.bubble img { 
+    max-width: 100%; 
+    border-radius: 8px; 
+    display: block; 
+    margin-top: 4px; 
+    cursor: zoom-in; 
+} 
  
  .left .bubble { background: rgba(255,255,255,0.96); color: rgba(15, 23, 42, 0.92); } 
  .right .bubble { background: linear-gradient(135deg, rgba(59,130,246,0.96), rgba(34,197,94,0.88)); color: rgba(255,255,255,0.96); border: 0; } 
@@ -404,10 +412,12 @@
      </div> 
  
      <div id="inputArea"> 
-         <input id="msg" placeholder="输入消息..."> 
-         <button id="emojiToggle" style="width:70px;background:#eee;color:#333;">表情</button> 
-         <button onclick="send()">发送</button> 
-     </div> 
+        <input id="msg" placeholder="输入消息..."> 
+        <input type="file" id="imageInput" accept="image/*" style="display:none;"> 
+        <button id="imageToggle" style="width:70px;background:#eee;color:#333;">图片</button> 
+        <button id="emojiToggle" style="width:70px;background:#eee;color:#333;">表情</button> 
+        <button onclick="send()">发送</button> 
+    </div> 
  </div> 
  
  <script> 
@@ -550,6 +560,34 @@
  const cancelReply = document.getElementById("cancelReply"); 
  const emojiPanel = document.getElementById("emojiPanel"); 
  const emojiToggle = document.getElementById("emojiToggle"); 
+const imageToggle = document.getElementById("imageToggle"); 
+const imageInput = document.getElementById("imageInput"); 
+
+imageToggle.addEventListener("click", () => imageInput.click()); 
+imageInput.addEventListener("change", (e) => { 
+    const file = e.target.files[0]; 
+    if (!file) return; 
+    if (file.size > 2 * 1024 * 1024) { 
+        alert("图片不能超过 2MB"); 
+        imageInput.value = ""; 
+        return; 
+    } 
+    const reader = new FileReader(); 
+    reader.onload = (ev) => { 
+        if (!ws || ws.readyState !== WebSocket.OPEN) { 
+            addSystem("未连接，稍后再试"); 
+            return; 
+        } 
+        ws.send(JSON.stringify({ 
+            type: "image", 
+            image: ev.target.result, 
+            replyTo: replyToId || undefined 
+        })); 
+        clearReply(); 
+    }; 
+    reader.readAsDataURL(file); 
+    imageInput.value = ""; 
+}); 
  
  function setExtraBarVisible() { 
      const visible = replyBar.style.display !== "none" || emojiPanel.style.display !== "none"; 
@@ -956,40 +994,41 @@ window.addEventListener("resize", updateHeight);
  setTimeout(updateHeight, 300); 
  
  /* 添加消息 */ 
- function addMessage(data) { 
-     const chat = document.getElementById("chat"); 
-     const isPm = data.type === "pm"; 
-     const sender = isPm ? data.from : data.user; 
-     const isMe = sender === username; 
- 
-     if (blocked.has(sender)) { 
-         return; 
-     } 
- 
-     const text = data.recalled ? "" : (data.text || ""); 
-     const mentionMe = !isMe && (text.includes("@" + username) || text.includes("@all")); 
-     if (!isMe) { 
-         notifyIncoming(sender, text, isPm, mentionMe || isPm); 
-     } 
- 
-     const msg = document.createElement("div"); 
-     const isMeAction = data.type === "me"; 
-     msg.className = "message " + (isMe ? "right" : "left") + (isPm ? " pm" : "") + (isMeAction ? " me" : "") + (mentionMe ? " mention" : ""); 
-     const mid = data.id || (Date.now().toString(16) + Math.random().toString(16).slice(2)); 
-     msg.dataset.id = mid; 
-     messageEls.set(mid, msg); 
-     messageData.set(mid, data); 
- 
-     const name = document.createElement("div"); 
-     name.className = "username"; 
-     if (isPm) { 
-         name.innerText = isMe ? ("你 ➜ " + data.to + " (私聊)") : (data.from + " ➜ 你 (私聊)"); 
-     } else if (isMeAction) { 
-         name.innerText = data.user; 
-     } else { 
-         name.innerText = data.user; 
-     } 
-     name.style.color = hashColor(sender || ""); 
+function addMessage(data) { 
+    const chat = document.getElementById("chat"); 
+    const isPm = data.type === "pm"; 
+    const isImage = data.type === "image"; 
+    const sender = isPm ? data.from : data.user; 
+    const isMe = sender === username; 
+
+    if (blocked.has(sender)) { 
+        return; 
+    } 
+
+    const text = data.recalled ? "" : (data.text || ""); 
+    const mentionMe = !isMe && text && (text.includes("@" + username) || text.includes("@all")); 
+    if (!isMe) { 
+        notifyIncoming(sender, isImage ? "[图片]" : text, isPm, mentionMe || isPm); 
+    } 
+
+    const msg = document.createElement("div"); 
+    const isMeAction = data.type === "me"; 
+    msg.className = "message " + (isMe ? "right" : "left") + (isPm ? " pm" : "") + (isMeAction ? " me" : "") + (mentionMe ? " mention" : ""); 
+    const mid = data.id || (Date.now().toString(16) + Math.random().toString(16).slice(2)); 
+    msg.dataset.id = mid; 
+    messageEls.set(mid, msg); 
+    messageData.set(mid, data); 
+
+    const name = document.createElement("div"); 
+    name.className = "username"; 
+    if (isPm) { 
+        name.innerText = isMe ? ("你 ➜ " + data.to + " (私聊)") : (data.from + " ➜ 你 (私聊)"); 
+    } else if (isMeAction) { 
+        name.innerText = data.user; 
+    } else { 
+        name.innerText = data.user; 
+    } 
+    name.style.color = hashColor(sender || ""); 
     name.style.display = "flex"; 
     name.style.alignItems = "center"; 
     name.style.justifyContent = "space-between"; 
@@ -1003,24 +1042,51 @@ window.addEventListener("resize", updateHeight);
         showActionSheet(mid); 
     }); 
     name.appendChild(actionBtn); 
- 
-     if (data.replyTo) { 
-         const ref = messageData.get(data.replyTo); 
-         const prev = document.createElement("div"); 
-         prev.className = "replyPreview"; 
-         if (ref) { 
-             const refSender = ref.type === "pm" ? ref.from : ref.user; 
-             const refText = ref.recalled ? "已撤回" : (ref.text || ""); 
-             prev.innerText = "回复 " + refSender + ": " + refText.slice(0, 40); 
-         } else { 
-             prev.innerText = "回复"; 
-         } 
-         msg.appendChild(prev); 
-     } 
- 
-     const bubble = document.createElement("div"); 
-     bubble.className = "bubble"; 
-     bubble.innerText = data.recalled ? "已撤回" : (data.type === "me" ? (sender + " " + text) : text); 
+
+    if (data.replyTo) { 
+        const ref = messageData.get(data.replyTo); 
+        const prev = document.createElement("div"); 
+        prev.className = "replyPreview"; 
+        if (ref) { 
+            const refSender = ref.type === "pm" ? ref.from : ref.user; 
+            let refContent = ref.recalled ? "已撤回" : (ref.text || ""); 
+            if (!ref.recalled && ref.type === "image") refContent = "[图片]"; 
+            prev.innerText = "回复 " + refSender + ": " + refContent.slice(0, 40); 
+        } else { 
+            prev.innerText = "回复"; 
+        } 
+        msg.appendChild(prev); 
+    } 
+
+    const bubble = document.createElement("div"); 
+    bubble.className = "bubble"; 
+    if (data.recalled) { 
+        bubble.innerText = "已撤回"; 
+    } else if (isImage) { 
+        const img = document.createElement("img"); 
+        img.src = data.image; 
+        img.onclick = () => { 
+            const overlay = document.createElement("div"); 
+            overlay.style.position = "fixed"; 
+            overlay.style.inset = "0"; 
+            overlay.style.background = "rgba(0,0,0,0.9)"; 
+            overlay.style.display = "flex"; 
+            overlay.style.alignItems = "center"; 
+            overlay.style.justifyContent = "center"; 
+            overlay.style.zIndex = "10000"; 
+            overlay.onclick = () => document.body.removeChild(overlay); 
+            const fullImg = document.createElement("img"); 
+            fullImg.src = data.image; 
+            fullImg.style.maxWidth = "95vw"; 
+            fullImg.style.maxHeight = "95vh"; 
+            fullImg.style.objectFit = "contain"; 
+            overlay.appendChild(fullImg); 
+            document.body.appendChild(overlay); 
+        }; 
+        bubble.appendChild(img); 
+    } else { 
+        bubble.innerText = (data.type === "me" ? (sender + " " + text) : text); 
+    } 
  
      const time = document.createElement("div"); 
      time.className = "time"; 

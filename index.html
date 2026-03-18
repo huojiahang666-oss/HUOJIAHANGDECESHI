@@ -418,6 +418,7 @@
          <div id="topRight"> 
             <input id="searchInput" placeholder="搜索" style="display:none;"> 
             <button class="topBtn" id="searchToggle">搜索</button> 
+            <button class="topBtn" id="showHelp">说明</button> 
             <button class="topBtn" id="clearChat">清屏</button> 
             <button class="topBtn" id="exitRoom" style="display:none;">退出</button> 
         </div> 
@@ -474,13 +475,12 @@
  let isLockedRoom = false; 
  let ownerName = ""; 
  let isOwner = false; 
- const helpTextShort = "回车发送 | 点击此处查看功能说明 💡"; 
-const helpTextFull = "🌟 聊天室功能全指引 🌟\n\n【基础操作】\n• 发送：回车键发送，Shift+回车换行\n• 图片：点击下方“图片”按钮发送压缩图\n• 缩放：点击聊天图片可查看大图\n• 清屏：点击顶部“清屏”按钮清空本地记录\n• 历史：点击顶部“查看更多”加载旧消息\n\n【快捷指令】\n• /pm 用户名 内容：发起私聊\n• /room 房间名：进入普通房间\n• /proom 房间名：进入密码房间\n• /roll 1d100：掷骰子互动\n• /flip：抛硬币 (正面/反面)\n• /me 动作：发送动作消息\n• /block 用户名：本地屏蔽某人\n• /unblock 用户名：取消屏蔽\n\n【互动管理】\n• 消息操作：点击消息右侧“⋯”或长按/右键\n  (包含：回复、表态、撤回、屏蔽)\n• 房主特权 (仅限密码房)：\n  /kick 用户名：踢出房间 (1分钟禁入)\n  /mute 用户名：禁言\n  /unmute 用户名：解除禁言"; 
- 
- const typingEl = document.getElementById("typing"); 
- typingEl.addEventListener("click", () => { 
-     alert(helpTextFull); 
- }); 
+  const helpTextFull = "🌟 聊天室功能全指引 🌟\n\n【基础操作】\n• 发送：回车键发送，Shift+回车换行\n• 图片：点击下方“图片”按钮发送压缩图\n• 缩放：点击聊天图片可查看大图\n• 清屏：点击顶部“清屏”按钮清空本地记录\n• 历史：点击顶部“查看更多”加载旧消息\n\n【快捷指令】\n• /pm 用户名 内容：发起私聊\n• /room 房间名：进入普通房间\n• /proom 房间名：进入密码房间\n• /roll 1d100：掷骰子互动\n• /flip：抛硬币 (正面/反面)\n• /me 动作：发送动作消息\n• /block 用户名：本地屏蔽某人\n• /unblock 用户名：取消屏蔽\n\n【互动管理】\n• 消息操作：点击消息右侧“⋯”或长按/右键\n  (包含：回复、表态、撤回、屏蔽)\n• 房主特权 (仅限密码房)：\n  /kick 用户名：踢出房间 (1分钟禁入)\n  /mute 用户名：禁言\n  /unmute 用户名：解除禁言"; 
+  
+  const typingEl = document.getElementById("typing"); 
+  document.getElementById("showHelp").addEventListener("click", () => { 
+      alert(helpTextFull); 
+  }); 
  
  const blocked = new Set(JSON.parse(localStorage.getItem("chat_blocked") || "[]")); 
  function saveBlocked() { 
@@ -746,12 +746,12 @@ imageInput.addEventListener("change", (e) => {
  } 
  
  function updateTopBar(countText, typingText) { 
-     const title = "聊天室" + (isLockedRoom ? " 🔒" : "") + (countText ? (" · " + countText) : ""); 
-     document.getElementById("roomTitle").innerText = title; 
-     const ownerHint = isLockedRoom && ownerName ? (" | 房主:" + ownerName + (isOwner ? "(你)" : "")) : ""; 
-     document.getElementById("typing").innerText = typingText || (helpTextShort + ownerHint); 
-     document.getElementById("exitRoom").style.display = isLockedRoom ? "" : "none"; 
- } 
+    const title = "聊天室" + (isLockedRoom ? " 🔒" : "") + (countText ? (" · " + countText) : ""); 
+    document.getElementById("roomTitle").innerText = title; 
+    const ownerHint = isLockedRoom && ownerName ? (" | 房主:" + ownerName + (isOwner ? "(你)" : "")) : ""; 
+    document.getElementById("typing").innerText = typingText || (ownerHint ? ownerHint.slice(3) : ""); 
+    document.getElementById("exitRoom").style.display = isLockedRoom ? "" : "none"; 
+} 
  updateTopBar("", ""); 
  let lastCountText = ""; 
  

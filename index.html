@@ -243,6 +243,7 @@
          <div id="topRight"> 
              <input id="searchInput" placeholder="搜索" style="display:none;"> 
              <button class="topBtn" id="searchToggle">搜索</button> 
+             <button class="topBtn" id="exitRoom">退出</button> 
          </div> 
      </div> 
      <div id="chat"></div> 
@@ -270,20 +271,28 @@
  } 
  
  const params = new URLSearchParams(location.search); 
- let room = (params.get("room") || localStorage.getItem("chat_room") || "").trim(); 
- if (!room) { 
-     room = "lobby"; 
+ let displayRoom = (params.get("room") || localStorage.getItem("chat_room") || "").trim(); 
+ if (!displayRoom) { 
+     displayRoom = "lobby"; 
  } 
- localStorage.setItem("chat_room", room); 
+ localStorage.setItem("chat_room", displayRoom); 
  
- let roomKey = (localStorage.getItem("chat_roomkey_" + room) || "").trim(); 
- if (!roomKey) { 
-     const k = (prompt("房间密码(可空)") || "").trim(); 
-     if (k) { 
-         roomKey = k; 
-         localStorage.setItem("chat_roomkey_" + room, roomKey); 
+ const lockRequested = ["1", "true", "yes"].includes((params.get("lock") || "").toLowerCase()); 
+ let roomKey = ""; 
+ if (lockRequested) { 
+     roomKey = (localStorage.getItem("chat_roomkey_" + displayRoom) || "").trim(); 
+     if (!roomKey) { 
+         roomKey = (prompt("房间密码(必填)") || "").trim(); 
+         if (!roomKey) { 
+             location.search = "?room=" + encodeURIComponent(displayRoom); 
+         } else { 
+             localStorage.setItem("chat_roomkey_" + displayRoom, roomKey); 
+         } 
      } 
  } 
+ 
+ let roomId = null; 
+ let isLockedRoom = false; 
  
  const blocked = new Set(JSON.parse(localStorage.getItem("chat_blocked") || "[]")); 
  function saveBlocked() { 
@@ -393,7 +402,7 @@
  } 
  
  function updateTopBar(countText, typingText) { 
-     const title = "聊天室 · " + room + (countText ? (" · " + countText) : ""); 
+     const title = "聊天室 · " + displayRoom + (isLockedRoom ? " 🔒" : "") + (countText ? (" · " + countText) : ""); 
      document.getElementById("roomTitle").innerText = title; 
      document.getElementById("typing").innerText = typingText || ""; 
  } 
@@ -536,18 +545,30 @@
  }); 
  
  let ws; 
+ let shouldReconnect = true; 
  function connect() { 
      ws = new WebSocket("wss://ducally-chemiluminescent-zenaida.ngrok-free.dev"); 
  
      ws.onopen = () => { 
          addSystem("已连接"); 
-         ws.send(JSON.stringify({user: username, room: room, roomKey: roomKey || undefined})); 
+         ws.send(JSON.stringify({user: username, room: displayRoom, roomKey: roomKey || undefined})); 
      }; 
  
      ws.onmessage = (e) => { 
          const data = JSON.parse(e.data); 
  
-         if (data.room && data.room !== room) { 
+         if (data.type === "roomInfo") { 
+             roomId = data.room || roomId; 
+             displayRoom = data.displayRoom || displayRoom; 
+             isLockedRoom = !!data.locked; 
+             updateTopBar(lastCountText, typingUsers.size ? (Array.from(typingUsers).slice(0,2).join("、") + " 正在输入…") : ""); 
+             if (isLockedRoom) { 
+                 addSystem("已进入密码房间"); 
+             } 
+             return; 
+         } 
+ 
+         if (roomId && data.room && data.room !== roomId) { 
              return; 
          } 
  
@@ -591,10 +612,20 @@
  
      ws.onclose = () => { 
          addSystem("连接断开，正在重连..."); 
-         setTimeout(connect, 1000); 
+         if (shouldReconnect) { 
+             setTimeout(connect, 1000); 
+         } 
      }; 
  } 
  connect(); 
+ 
+ document.getElementById("exitRoom").addEventListener("click", () => { 
+     shouldReconnect = false; 
+     try { 
+         if (ws) ws.close(); 
+     } catch {} 
+     location.search = "?room=lobby"; 
+ }); 
  
  /* ✅ 终极防遮挡 */ 
  function updateHeight() { 
@@ -821,6 +852,15 @@
          if (r) { 
              localStorage.setItem("chat_room", r); 
              location.search = "?room=" + encodeURIComponent(r); 
+         } 
+         return; 
+     } 
+ 
+     if (text.startsWith("/proom ")) { 
+         const r = text.slice(7).trim(); 
+         if (r) { 
+             localStorage.setItem("chat_room", r); 
+             location.search = "?room=" + encodeURIComponent(r) + "&lock=1"; 
          } 
          return; 
      } 

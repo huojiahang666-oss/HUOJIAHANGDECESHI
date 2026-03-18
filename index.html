@@ -80,6 +80,65 @@
      width: auto; 
  } 
  
+ .msgActionBtn { 
+     width: auto; 
+     height: 22px; 
+     border-radius: 8px; 
+     border: 0; 
+     padding: 0 8px; 
+     background: rgba(0,0,0,0.08); 
+     color: #333; 
+ } 
+ 
+ #actionSheet { 
+     position: fixed; 
+     inset: 0; 
+     display: none; 
+     align-items: flex-end; 
+     justify-content: center; 
+     background: rgba(0,0,0,0.35); 
+     z-index: 9999; 
+ } 
+ 
+ #actionSheetPanel { 
+     width: 100%; 
+     max-width: 520px; 
+     background: white; 
+     border-radius: 14px 14px 0 0; 
+     padding: 10px; 
+     padding-bottom: calc(10px + env(safe-area-inset-bottom)); 
+ } 
+ 
+ #actionSheetTitle { 
+     font-size: 13px; 
+     color: #333; 
+     padding: 4px 2px 10px 2px; 
+     overflow: hidden; 
+     text-overflow: ellipsis; 
+     white-space: nowrap; 
+ } 
+ 
+ .sheetRow { 
+     display: flex; 
+     gap: 8px; 
+     flex-wrap: wrap; 
+ } 
+ 
+ .sheetBtn { 
+     flex: 1; 
+     min-width: 90px; 
+     height: 38px; 
+     border-radius: 10px; 
+     border: 0; 
+     background: #f2f2f2; 
+     color: #222; 
+ } 
+ 
+ .sheetBtnDanger { 
+     background: #ffebee; 
+     color: #c62828; 
+ } 
+ 
  /* 聊天区 */ 
  #chat { 
      overflow-y: auto; 
@@ -301,6 +360,77 @@
  const blocked = new Set(JSON.parse(localStorage.getItem("chat_blocked") || "[]")); 
  function saveBlocked() { 
      localStorage.setItem("chat_blocked", JSON.stringify(Array.from(blocked))); 
+ } 
+ 
+ const actionSheet = document.createElement("div"); 
+ actionSheet.id = "actionSheet"; 
+ actionSheet.innerHTML = '<div id="actionSheetPanel"><div id="actionSheetTitle"></div><div class="sheetRow" id="actionSheetRow"></div></div>'; 
+ document.body.appendChild(actionSheet); 
+ actionSheet.addEventListener("click", (e) => { 
+     if (e.target === actionSheet) { 
+         actionSheet.style.display = "none"; 
+     } 
+ }); 
+ 
+ function showActionSheet(mid) { 
+     const d = messageData.get(mid); 
+     if (!d) return; 
+     const sender = d.type === "pm" ? d.from : d.user; 
+     const isMe = sender === username; 
+     const titleEl = document.getElementById("actionSheetTitle"); 
+     const rowEl = document.getElementById("actionSheetRow"); 
+     titleEl.innerText = (sender || "") + (d.type === "pm" ? " (私聊)" : ""); 
+     rowEl.innerHTML = ""; 
+ 
+     const addBtn = (label, onClick, danger) => { 
+         const b = document.createElement("button"); 
+         b.className = "sheetBtn" + (danger ? " sheetBtnDanger" : ""); 
+         b.type = "button"; 
+         b.innerText = label; 
+         b.onclick = () => { 
+             actionSheet.style.display = "none"; 
+             onClick(); 
+         }; 
+         rowEl.appendChild(b); 
+     }; 
+ 
+     addBtn("回复", () => setReplyTarget(mid)); 
+     addBtn("表态", () => { 
+         if (!ws || ws.readyState !== WebSocket.OPEN) { 
+             addSystem("未连接，稍后再试"); 
+             return; 
+         } 
+         const emoji = (prompt("输入表情(如 👍 ❤️ 😂)") || "").trim(); 
+         if (!emoji) return; 
+         ws.send(JSON.stringify({type: "react", id: mid, emoji: emoji})); 
+     }); 
+ 
+     if (isMe && (d.type === "chat" || d.type === "me") && !d.recalled) { 
+         addBtn("撤回", () => { 
+             if (ws && ws.readyState === WebSocket.OPEN) { 
+                 ws.send(JSON.stringify({type: "recall", id: mid})); 
+             } 
+         }, true); 
+     } 
+ 
+     if (sender && sender !== username) { 
+         if (blocked.has(sender)) { 
+             addBtn("取消屏蔽", () => { 
+                 blocked.delete(sender); 
+                 saveBlocked(); 
+                 addSystem("已取消屏蔽: " + sender); 
+             }); 
+         } else { 
+             addBtn("屏蔽此人", () => { 
+                 blocked.add(sender); 
+                 saveBlocked(); 
+                 addSystem("已屏蔽: " + sender); 
+             }, true); 
+         } 
+     } 
+ 
+     addBtn("取消", () => {}, false); 
+     actionSheet.style.display = "flex"; 
  } 
  
  const messageEls = new Map(); 
@@ -693,6 +823,19 @@
          name.innerText = data.user; 
      } 
      name.style.color = hashColor(sender || ""); 
+    name.style.display = "flex"; 
+    name.style.alignItems = "center"; 
+    name.style.justifyContent = "space-between"; 
+    name.style.gap = "8px"; 
+    const actionBtn = document.createElement("button"); 
+    actionBtn.type = "button"; 
+    actionBtn.className = "msgActionBtn"; 
+    actionBtn.innerText = "⋯"; 
+    actionBtn.addEventListener("click", (ev) => { 
+        ev.stopPropagation(); 
+        showActionSheet(mid); 
+    }); 
+    name.appendChild(actionBtn); 
  
      if (data.replyTo) { 
          const ref = messageData.get(data.replyTo); 
@@ -727,7 +870,7 @@
  
      msg.addEventListener("contextmenu", (ev) => { 
          ev.preventDefault(); 
-         openMessageActions(mid); 
+        showActionSheet(mid); 
      }); 
  
      let pressTimer = null; 
@@ -747,7 +890,7 @@
          pressTimer = setTimeout(() => { 
              pressTimer = null; 
              longPressed = true; 
-             openMessageActions(mid); 
+             showActionSheet(mid); 
          }, 450); 
      }); 
      msg.addEventListener("pointermove", (ev) => { 
@@ -769,7 +912,7 @@
          const now = Date.now(); 
          if (now - lastTapAt < 300) { 
              lastTapAt = 0; 
-             openMessageActions(mid); 
+             showActionSheet(mid); 
          } else { 
              lastTapAt = now; 
          } 
@@ -826,43 +969,9 @@
      if (bubble) bubble.innerText = "已撤回"; 
  } 
  
- function openMessageActions(mid) { 
-     const d = messageData.get(mid); 
-     if (!d) return; 
-     const sender = d.type === "pm" ? d.from : d.user; 
-     const isMe = sender === username; 
-     const choices = ["1 回复", "2 表态", "3 屏蔽此人"]; 
-     if (isMe && (d.type === "chat" || d.type === "me") && !d.recalled) { 
-         choices.splice(2, 0, "3 撤回"); 
-         choices[3] = "4 屏蔽此人"; 
-     } 
-     const sel = (prompt("操作:\\n" + choices.join("\\n")) || "").trim(); 
-     if (sel === "1") { 
-         setReplyTarget(mid); 
-         return; 
-     } 
-     if (sel === "2") { 
-         const emoji = (prompt("输入表情(如 👍 ❤️ 😂)") || "").trim(); 
-         if (!emoji) return; 
-         if (ws && ws.readyState === WebSocket.OPEN) { 
-             ws.send(JSON.stringify({type: "react", id: mid, emoji: emoji})); 
-         } 
-         return; 
-     } 
-     if (sel === "3" && isMe && (d.type === "chat" || d.type === "me") && !d.recalled) { 
-         if (ws && ws.readyState === WebSocket.OPEN) { 
-             ws.send(JSON.stringify({type: "recall", id: mid})); 
-         } 
-         return; 
-     } 
-     if (sel === "3" || sel === "4") { 
-         if (sender && sender !== username) { 
-             blocked.add(sender); 
-             saveBlocked(); 
-             addSystem("已屏蔽: " + sender); 
-         } 
-     } 
- } 
+function openMessageActions(mid) { 
+    showActionSheet(mid); 
+} 
  
  /* 系统消息 */ 
  function addSystem(text) { 

@@ -1550,10 +1550,11 @@ function syncAuthModeUI() {
  const replyText = document.getElementById("replyText"); 
  const cancelReply = document.getElementById("cancelReply"); 
  const emojiPanel = document.getElementById("emojiPanel"); 
- // 语音功能逻辑抽离
+     // 语音功能逻辑抽离
     let mediaRecorder;
     let audioChunks = [];
     let isRecording = false;
+    let recordingStartTime;
 
     async function handleVoiceRecording(btn, targetUser = null) {
         if (!isRecording) {
@@ -1579,6 +1580,7 @@ function syncAuthModeUI() {
                 };
                 
                 mediaRecorder.onstop = async () => {
+                    const duration = Math.round((Date.now() - recordingStartTime) / 1000);
                     const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
                     
                     if (audioBlob.size === 0) {
@@ -1602,12 +1604,14 @@ function syncAuthModeUI() {
                                     type: "pm",
                                     to: targetUser,
                                     text: base64Audio,
-                                    msg_type: "voice"
+                                    msg_type: "voice",
+                                    duration: duration
                                 }));
                             } else {
                                 ws.send(JSON.stringify({
                                     type: "voice",
-                                    voice: base64Audio
+                                    voice: base64Audio,
+                                    duration: duration
                                 }));
                             }
                         }
@@ -1616,6 +1620,7 @@ function syncAuthModeUI() {
                     stream.getTracks().forEach(track => track.stop());
                 };
                 
+                recordingStartTime = Date.now();
                 mediaRecorder.start();
                 isRecording = true;
                 btn.dataset.oldHtml = btn.innerHTML;
@@ -2701,11 +2706,19 @@ function addPrivateMessage(data) {
         voiceBtn.style.display = "flex";
         voiceBtn.style.alignItems = "center";
         voiceBtn.style.gap = "8px";
-        voiceBtn.innerHTML = `<span>🎤</span> <span>[语音消息 - 点击播放]</span>`;
+        const durationText = data.duration ? ` ${data.duration}"` : "";
+        voiceBtn.innerHTML = `<span>🎤</span> <span>[语音消息${durationText} - 点击播放]</span>`;
         voiceBtn.onclick = () => {
-            const audio = new Audio(data.text);
+            const audio = new Audio();
+            const voiceData = data.text;
+            if (voiceData && !voiceData.startsWith("data:")) {
+                audio.src = "data:audio/webm;base64," + voiceData;
+            } else {
+                audio.src = voiceData;
+            }
+            audio.load();
             audio.play().catch(err => {
-                console.error("播放失败:", err);
+                console.error("私聊语音播放失败:", err);
                 alert("播放失败，请检查浏览器权限");
             });
         };
@@ -3263,7 +3276,8 @@ function addMessage(data, prepend = false) {
         voiceBtn.style.display = "flex";
         voiceBtn.style.alignItems = "center";
         voiceBtn.style.gap = "8px";
-        voiceBtn.innerHTML = `<span>🎤</span> <span>[语音消息 - 点击播放]</span>`;
+        const durationText = data.duration ? ` ${data.duration}"` : "";
+        voiceBtn.innerHTML = `<span>🎤</span> <span>[语音消息${durationText} - 点击播放]</span>`;
         voiceBtn.onclick = () => {
             const voiceData = data.type === "voice" ? data.voice : data.text;
             if (!voiceData) return;

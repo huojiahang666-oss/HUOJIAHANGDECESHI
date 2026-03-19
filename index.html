@@ -1533,7 +1533,25 @@ let unreadRequests = 0;
             }
 
             if (data.type === "friend_request_accepted") {
-                addSystem(data.user + " 接受了你的好友申请");
+                addSystem(data.text || (data.user + " 接受了你的好友申请"));
+                if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({type: "get_friends"}));
+                return;
+            }
+
+            if (data.type === "friend_respond_success") {
+                addSystem(data.text);
+                if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({type: "get_friends"}));
+                return;
+            }
+
+            if (data.type === "delete_success") {
+                alert("删除成功");
+                if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({type: "get_friends"}));
+                return;
+            }
+
+            if (data.type === "deleted_by_friend") {
+                addSystem(data.text || "对方将你从好友列表中删除了");
                 if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({type: "get_friends"}));
                 return;
             }

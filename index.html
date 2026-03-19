@@ -2413,6 +2413,10 @@ let unreadPrivateMsgs = {}; // { username: count }
             addMessage(data); 
         } 
 
+        if (data.type === "voice") { 
+            addMessage(data); 
+        } 
+
         if (data.type === "typing") { 
              setTypingUser(data.user, data.isTyping); 
          } 

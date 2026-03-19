@@ -1214,7 +1214,11 @@ body {
                  </div>
              </div>
          </div>
-         <div id="privateChatList"></div>
+        <div id="privateChatList"></div>
+        <div id="privateReplyBar" style="display:none;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;border-top:1px solid rgba(15,23,42,0.06);background:rgba(255,255,255,0.92);">
+            <div id="privateReplyText" style="font-size:12px;color:#333;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;"></div>
+            <button id="privateCancelReply" type="button" style="height:26px;border-radius:6px;background:#eee;color:#333;border:none;padding:0 10px;">取消</button>
+        </div>
          <div id="privateInputArea">
             <input type="file" id="privateImageInput" accept="image/*" style="display:none;">
             <button id="privateImageBtn" type="button" aria-label="发送图片">
@@ -1471,21 +1475,35 @@ function syncAuthModeUI() {
         rowEl.appendChild(b); 
     }; 
  
-    addBtn("回复", () => setReplyTarget(mid)); 
-    addBtn("表态", () => { 
+   addBtn("回复", () => { 
+       if ((d.type === "pm" || d.type === "private") && activePrivateChat) { 
+           setPrivateReplyTarget(mid); 
+       } else { 
+           setReplyTarget(mid); 
+       } 
+   }); 
+   addBtn("表态", () => { 
         if (!ws || ws.readyState !== WebSocket.OPEN) { 
             addSystem("未连接，稍后再试"); 
             return; 
         } 
         const emoji = (prompt("输入表情(如 👍 ❤️ 😂)") || "").trim(); 
         if (!emoji) return; 
-        ws.send(JSON.stringify({type: "react", id: mid, emoji: emoji})); 
+        if ((d.type === "pm" || d.type === "private") && activePrivateChat) { 
+            ws.send(JSON.stringify({type: "react_private", id: mid, emoji: emoji})); 
+        } else { 
+            ws.send(JSON.stringify({type: "react", id: mid, emoji: emoji})); 
+        } 
     }); 
  
-    if ((isMe || isAdmin) && (d.type === "chat" || d.type === "me" || d.type === "image" || d.type === "voice") && !d.recalled) { 
+   if ((isMe || isAdmin) && (d.type === "chat" || d.type === "me" || d.type === "image" || d.type === "voice" || d.type === "pm" || d.type === "private") && !d.recalled) { 
         addBtn("撤回", () => { 
             if (ws && ws.readyState === WebSocket.OPEN) { 
-                ws.send(JSON.stringify({type: "recall", id: mid})); 
+                if ((d.type === "pm" || d.type === "private") && activePrivateChat) { 
+                    ws.send(JSON.stringify({type: "recall_private", id: mid})); 
+                } else { 
+                    ws.send(JSON.stringify({type: "recall", id: mid})); 
+                } 
             } 
         }, true); 
     } 
@@ -1601,12 +1619,15 @@ function syncAuthModeUI() {
                         if (ws && ws.readyState === WebSocket.OPEN) {
                             if (targetUser) {
                                 ws.send(JSON.stringify({
-                                    type: "pm",
+                                    type: "send_private_msg",
                                     to: targetUser,
                                     text: base64Audio,
                                     msg_type: "voice",
-                                    duration: duration
+                                    duration: duration,
+                                    replyTo: privateReplyToId || undefined
                                 }));
+                                privateReplyToId = null;
+                                privateReplyBar.style.display = "none";
                             } else {
                                 ws.send(JSON.stringify({
                                     type: "voice",
@@ -2505,6 +2526,27 @@ const privateImageInput = document.getElementById("privateImageInput");
 const privateImageBtn = document.getElementById("privateImageBtn");
 const privateMsgInput = document.getElementById("privateMsgInput");
 const privateSendBtn = document.getElementById("privateSendBtn");
+const privateReplyBar = document.getElementById("privateReplyBar");
+const privateReplyText = document.getElementById("privateReplyText");
+const privateCancelReply = document.getElementById("privateCancelReply");
+let privateReplyToId = null;
+
+function setPrivateReplyTarget(mid) {
+    const d = messageData.get(mid);
+    if (!d) return;
+    privateReplyToId = mid;
+    const sender = d.type === "pm" ? d.from : (d.user || d.from || "");
+    let preview = d.recalled ? "已撤回" : (d.text || "");
+    if (!d.recalled && (d.msg_type === "image" || d.type === "image")) preview = "[图片]";
+    if (!d.recalled && (d.msg_type === "voice" || d.type === "voice")) preview = "[语音]";
+    privateReplyText.innerText = "回复 " + (sender || "") + ": " + String(preview).slice(0, 40);
+    privateReplyBar.style.display = "flex";
+}
+
+privateCancelReply.addEventListener("click", () => {
+    privateReplyToId = null;
+    privateReplyBar.style.display = "none";
+});
 
 function updateFriendBadge() {
     const pending = myFriends.filter(f => f.status === "pending" && !f.is_requester).length;
@@ -2663,9 +2705,15 @@ function openPrivateChat(target) {
 }
 
 function addPrivateMessage(data) {
+    if (!data) return;
+    data.type = "pm";
     const isMe = data.from === username;
     const msg = document.createElement("div");
     msg.className = "pm-message " + (isMe ? "right" : "left");
+    const mid = data.id || (Date.now().toString(16) + Math.random().toString(16).slice(2));
+    msg.dataset.id = String(mid);
+    messageEls.set(String(mid), msg);
+    messageData.set(String(mid), data);
     
     const avatarUrl = data.avatar || "https://api.dicebear.com/7.x/identicon/svg?seed=" + (data.from || "anon");
 
@@ -2676,11 +2724,39 @@ function addPrivateMessage(data) {
     const wrapper = document.createElement("div");
     wrapper.className = "pm-content-wrapper";
 
+    if (data.replyTo) {
+        const ref = messageData.get(String(data.replyTo));
+        const prev = document.createElement("div");
+        prev.className = "replyPreview";
+        if (ref) {
+            const refSender = ref.type === "pm" ? ref.from : ref.user;
+            let refContent = ref.recalled ? "已撤回" : (ref.text || "");
+            if (!ref.recalled && (ref.msg_type === "image" || ref.type === "image")) refContent = "[图片]";
+            if (!ref.recalled && (ref.msg_type === "voice" || ref.type === "voice")) refContent = "[语音]";
+            prev.innerText = "回复 " + refSender + ": " + String(refContent).slice(0, 40);
+        } else {
+            prev.innerText = "回复";
+        }
+        wrapper.appendChild(prev);
+    }
+
     const bubble = document.createElement("div");
     const isImage = data.msg_type === "image" || (typeof data.text === "string" && data.text.startsWith("data:image/"));
     bubble.className = "pm-bubble" + (isImage ? " image" : "");
+    
+    const actions = document.createElement("button");
+    actions.type = "button";
+    actions.className = "msgActionBtn";
+    actions.innerText = "⋯";
+    actions.style.marginLeft = "8px";
+    actions.onclick = (ev) => {
+        ev.stopPropagation();
+        showActionSheet(String(mid));
+    };
 
-    if (isImage) {
+    if (data.recalled) {
+        bubble.innerText = "已撤回";
+    } else if (isImage) {
         const img = document.createElement("img");
         img.src = data.text;
         img.onclick = () => {
@@ -2730,17 +2806,23 @@ function addPrivateMessage(data) {
         bubble.innerText = data.text || "";
     }
 
+    const reactions = document.createElement("div");
+    reactions.className = "reactions";
+
     const time = document.createElement("div");
     time.className = "pm-time";
     time.innerText = data.time || "";
 
     wrapper.appendChild(bubble);
+    wrapper.appendChild(reactions);
     wrapper.appendChild(time);
 
     msg.appendChild(avatar);
     msg.appendChild(wrapper);
+    wrapper.appendChild(actions);
     privateChatList.appendChild(msg);
     privateChatList.scrollTop = privateChatList.scrollHeight;
+    renderReactions(String(mid));
 }
 
 friendsBtn.addEventListener("click", () => {
@@ -2875,8 +2957,11 @@ privateImageInput.addEventListener("change", (e) => {
                         type: "send_private_msg",
                         to: activePrivateChat,
                         text: compressedBase64,
-                        msg_type: "image"
+                        msg_type: "image",
+                        replyTo: privateReplyToId || undefined
                     }));
+                    privateReplyToId = null;
+                    privateReplyBar.style.display = "none";
                     document.body.removeChild(overlay);
                 };
 
@@ -2904,8 +2989,10 @@ privateImageInput.addEventListener("change", (e) => {
 privateSendBtn.addEventListener("click", () => {
     const text = privateMsgInput.value.trim();
     if (text && activePrivateChat) {
-        ws.send(JSON.stringify({type: "send_private_msg", to: activePrivateChat, text: text}));
+        ws.send(JSON.stringify({type: "send_private_msg", to: activePrivateChat, text: text, replyTo: privateReplyToId || undefined}));
         privateMsgInput.value = "";
+        privateReplyToId = null;
+        privateReplyBar.style.display = "none";
     }
 });
 
@@ -3399,7 +3486,7 @@ function applyRecall(data) {
     if (!d || !el) return; 
     d.recalled = true; 
     d.text = ""; 
-    const bubble = el.querySelector(".bubble"); 
+    const bubble = el.querySelector(".bubble") || el.querySelector(".pm-bubble"); 
     if (bubble) bubble.innerText = "已撤回"; 
 } 
 

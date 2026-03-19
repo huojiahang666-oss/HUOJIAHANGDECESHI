@@ -2,7 +2,7 @@
  <html lang="zh"> 
  <head> 
  <meta charset="UTF-8"> 
- <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"> 
+ <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"> 
  <title>聊天室</title> 
  
  <style> 
@@ -35,7 +35,13 @@
      color: var(--text); 
      -webkit-font-smoothing: antialiased; 
      -moz-osx-font-smoothing: grayscale; 
+     -webkit-tap-highlight-color: transparent; 
+     touch-action: manipulation; 
  } 
+ 
+ /* 消息文本和输入框允许选中，其他禁止选中，避免手机误触 */
+ * { -webkit-user-select: none; user-select: none; }
+ input, textarea, .bubble, .username, .time, .system { -webkit-user-select: text; user-select: text; }
  
  /* 主区域 */ 
 #main { 
@@ -54,7 +60,6 @@
     overflow: hidden; 
     /* 提升移动端平滑度 */ 
     will-change: height, top; 
-    transition: height 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.2s cubic-bezier(0.2, 0.8, 0.2, 1); 
 } 
 
 /* 顶部 */ 
@@ -200,6 +205,7 @@
 #chat { 
     flex: 1; 
     overflow-y: auto; 
+    overscroll-behavior-y: contain; 
     padding: 14px; 
     box-sizing: border-box; 
     margin: 12px 10px 12px 10px; 
@@ -1068,13 +1074,11 @@ imageInput.addEventListener("change", (e) => {
         typingSent = false; 
         sendTyping(false); 
     } 
-    // 强制立即重置并更新，利用 CSS transition 实现平滑 
-    window.scrollTo(0, 0); 
+    // 移除导致抖动的强制滚动
     updateHeight(); 
 }); 
 msgInput.addEventListener("focus", () => { 
-    // 强制立即更新 
-    window.scrollTo(0, 0); 
+    // 移除导致抖动的强制滚动
     updateHeight(); 
 }); 
  
@@ -1299,7 +1303,7 @@ document.getElementById("exitRoom").addEventListener("click", () => {
      location.search = "?room=lobby"; 
  }); 
  
- /* ✅ 终极防遮挡 */ 
+ /* ✅ 终极防遮挡 - 优化抖动版 */ 
 let updateHeightPending = false; 
 function updateHeight() { 
     if (updateHeightPending) return; 
@@ -1315,10 +1319,10 @@ function updateHeight() {
             main.style.height = height + "px"; 
             main.style.top = offsetTop + "px"; 
             
-            // 只有当键盘完全收回或刚弹出时才尝试强制 scrollTo，避免过度干预 
-            if (offsetTop > 0) { 
-                window.scrollTo(0, 0); 
-            } 
+            // 只有当页面确实被滚动了才尝试重置，且不使用强制 scrollTo(0,0)
+            if (window.scrollY > 0) {
+                window.scrollTo(0, 0);
+            }
         } else { 
             main.style.height = window.innerHeight + "px"; 
         } 

@@ -114,6 +114,121 @@
      gap: 6px; 
  } 
  
+ #membersPage {
+     position: absolute;
+     inset: 0;
+     display: none;
+     flex-direction: column;
+     background: rgba(255,255,255,0.96);
+     z-index: 5000;
+ }
+ 
+ #membersHeader {
+     height: 40px;
+     flex-shrink: 0;
+     display: flex;
+     align-items: center;
+     justify-content: space-between;
+     padding: 0 10px;
+     background: rgba(15, 23, 42, 0.78);
+     color: rgba(255,255,255,0.92);
+     backdrop-filter: blur(12px);
+     -webkit-backdrop-filter: blur(12px);
+     border-bottom: 1px solid rgba(255,255,255,0.10);
+ }
+ 
+ #membersHeaderLeft {
+     display: flex;
+     align-items: center;
+     gap: 8px;
+     min-width: 0;
+ }
+ 
+ #membersTitle {
+     font-weight: 600;
+     white-space: nowrap;
+     overflow: hidden;
+     text-overflow: ellipsis;
+ }
+ 
+ #membersList {
+     flex: 1;
+     overflow-y: auto;
+     -webkit-overflow-scrolling: touch;
+     padding: 10px 0 calc(10px + env(safe-area-inset-bottom)) 0;
+ }
+ 
+ .memberSectionTitle {
+     padding: 10px 14px 6px 14px;
+     font-size: 12px;
+     color: rgba(15, 23, 42, 0.55);
+ }
+ 
+ .memberItem {
+     display: flex;
+     align-items: center;
+     gap: 10px;
+     padding: 10px 14px;
+ }
+ 
+ .memberItem:active {
+     background: rgba(15, 23, 42, 0.04);
+ }
+ 
+ .memberAvatar {
+     width: 42px;
+     height: 42px;
+     border-radius: 12px;
+     object-fit: cover;
+     background: rgba(15, 23, 42, 0.06);
+     flex-shrink: 0;
+ }
+ 
+ .memberMeta {
+     min-width: 0;
+     display: flex;
+     flex-direction: column;
+     gap: 2px;
+ }
+ 
+ .memberNameRow {
+     display: flex;
+     align-items: center;
+     gap: 8px;
+     min-width: 0;
+ }
+ 
+ .memberName {
+     font-size: 14px;
+     font-weight: 600;
+     color: rgba(15, 23, 42, 0.92);
+     white-space: nowrap;
+     overflow: hidden;
+     text-overflow: ellipsis;
+ }
+ 
+ .memberSub {
+     font-size: 12px;
+     color: rgba(15, 23, 42, 0.55);
+     white-space: nowrap;
+     overflow: hidden;
+     text-overflow: ellipsis;
+ }
+ 
+ .memberBadge {
+     font-size: 11px;
+     padding: 2px 8px;
+     border-radius: 999px;
+     background: rgba(59, 130, 246, 0.12);
+     color: rgba(59, 130, 246, 1);
+     flex-shrink: 0;
+ }
+ 
+ .memberBadgeDanger {
+     background: rgba(239, 68, 68, 0.12);
+     color: rgba(239, 68, 68, 1);
+ }
+ 
  #searchInput { 
      height: 26px; 
      border-radius: 10px; 
@@ -452,12 +567,24 @@
          </div> 
          <div id="topRight"> 
             <input id="searchInput" placeholder="搜索" style="display:none;"> 
+            <button class="topBtn" id="membersBtn">成员</button>
             <button class="topBtn" id="searchToggle">搜索</button> 
             <button class="topBtn" id="showHelp">说明</button> 
             <button class="topBtn" id="clearChat">清屏</button> 
             <button class="topBtn" id="exitRoom" style="display:none;">退出房间</button> 
         </div> 
      </div> 
+ 
+     <div id="membersPage">
+         <div id="membersHeader">
+             <div id="membersHeaderLeft">
+                 <button class="topBtn" id="membersBack">返回</button>
+                 <div id="membersTitle">在线成员</div>
+             </div>
+             <div></div>
+         </div>
+         <div id="membersList"></div>
+     </div>
       <div id="chat"> 
          <div id="loadMore" class="loadMore"> 
              <button class="loadMoreBtn" onclick="loadMoreHistory()">查看更多历史消息</button> 
@@ -1184,6 +1311,8 @@ msgInput.addEventListener("focus", () => {
  let ws; 
  let shouldReconnect = true; 
  let forcedLogout = false;
+let latestMembers = [];
+let latestMembersRoom = "";
  function forceLogout(text) {
      forcedLogout = true;
      shouldReconnect = false;
@@ -1329,6 +1458,20 @@ msgInput.addEventListener("focus", () => {
                 return; 
             } 
 
+            if (data.type === "users") {
+                latestMembersRoom = data.room || latestMembersRoom;
+                const members = Array.isArray(data.members) ? data.members : [];
+                if (members.length) {
+                    latestMembers = members;
+                } else if (Array.isArray(data.users)) {
+                    latestMembers = data.users.map(u => ({username: u, nickname: u, avatar: null, role: "user"}));
+                }
+                if (document.getElementById("membersPage").style.display === "flex") {
+                    renderMembers();
+                }
+                return;
+            }
+
             if (data.type === "history_batch") { 
                 const msgs = data.messages || []; 
                 const chat = document.getElementById("chat"); 
@@ -1424,6 +1567,120 @@ msgInput.addEventListener("focus", () => {
      }; 
  } 
  connect(); 
+
+const membersBtn = document.getElementById("membersBtn");
+const membersPage = document.getElementById("membersPage");
+const membersBack = document.getElementById("membersBack");
+const membersTitle = document.getElementById("membersTitle");
+const membersList = document.getElementById("membersList");
+
+function normalizeAvatar(member) {
+    if (member && member.avatar) return member.avatar;
+    const seed = (member && (member.username || member.nickname)) || "anon";
+    return "https://api.dicebear.com/7.x/identicon/svg?seed=" + encodeURIComponent(seed);
+}
+
+function renderMembers() {
+    const roomDisplay = (isLockedRoom ? (displayRoom || "房间") : (displayRoom || "大厅"));
+    const count = Array.isArray(latestMembers) ? latestMembers.length : 0;
+    membersTitle.innerText = roomDisplay + " · 在线成员 (" + count + ")";
+
+    const owner = ownerName || "";
+    const members = Array.isArray(latestMembers) ? latestMembers.slice() : [];
+    members.sort((a, b) => {
+        const an = (a.nickname || a.username || "").toLowerCase();
+        const bn = (b.nickname || b.username || "").toLowerCase();
+        return an.localeCompare(bn);
+    });
+
+    const ownerList = [];
+    const adminList = [];
+    const normalList = [];
+    for (const m of members) {
+        const u = (m.username || "").trim();
+        if (owner && u === owner) {
+            ownerList.push(m);
+            continue;
+        }
+        if ((m.role || "") === "admin") {
+            adminList.push(m);
+            continue;
+        }
+        normalList.push(m);
+    }
+
+    const frag = document.createDocumentFragment();
+    const addSection = (title, list, badgeBuilder) => {
+        if (!list.length) return;
+        const t = document.createElement("div");
+        t.className = "memberSectionTitle";
+        t.innerText = title;
+        frag.appendChild(t);
+        for (const m of list) {
+            const item = document.createElement("div");
+            item.className = "memberItem";
+
+            const img = document.createElement("img");
+            img.className = "memberAvatar";
+            img.src = normalizeAvatar(m);
+            item.appendChild(img);
+
+            const meta = document.createElement("div");
+            meta.className = "memberMeta";
+
+            const nameRow = document.createElement("div");
+            nameRow.className = "memberNameRow";
+
+            const name = document.createElement("div");
+            name.className = "memberName";
+            name.innerText = (m.nickname || m.username || "匿名");
+            nameRow.appendChild(name);
+
+            const badgeText = badgeBuilder ? badgeBuilder(m) : "";
+            if (badgeText) {
+                const badge = document.createElement("div");
+                badge.className = "memberBadge";
+                if (badgeText === "管理员") badge.className += " memberBadgeDanger";
+                badge.innerText = badgeText;
+                nameRow.appendChild(badge);
+            }
+
+            meta.appendChild(nameRow);
+
+            const sub = document.createElement("div");
+            sub.className = "memberSub";
+            const uname = (m.username || "").trim();
+            const nick = (m.nickname || "").trim();
+            sub.innerText = (nick && uname && nick !== uname) ? ("账号: " + uname) : "";
+            meta.appendChild(sub);
+
+            item.appendChild(meta);
+            frag.appendChild(item);
+        }
+    };
+
+    addSection("群主", ownerList, () => "群主");
+    addSection("管理员", adminList, () => "管理员");
+    addSection("成员", normalList, () => "");
+
+    membersList.innerHTML = "";
+    membersList.appendChild(frag);
+}
+
+function openMembers() {
+    membersPage.style.display = "flex";
+    renderMembers();
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({type: "get_users"}));
+    }
+}
+
+function closeMembers() {
+    membersPage.style.display = "none";
+}
+
+membersBtn.addEventListener("click", openMembers);
+membersBack.addEventListener("click", closeMembers);
  
  document.getElementById("clearChat").addEventListener("click", () => {
     if (confirm("确定要清空当前的聊天记录吗？(仅本地清屏)")) {

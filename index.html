@@ -524,6 +524,7 @@
 
  <script> 
  let username = ""; 
+ let nickname = "";
  
  const params = new URLSearchParams(location.search); 
  let displayRoom = (params.get("room") || localStorage.getItem("chat_room") || "").trim(); 
@@ -1075,6 +1076,14 @@ imageInput.addEventListener("change", (e) => {
          rowEl.appendChild(b); 
      };
 
+     addBtn("修改昵称", () => {
+         const newNick = (prompt("请输入新昵称", nickname) || "").trim();
+         if (newNick && newNick !== nickname) {
+             if (ws && ws.readyState === WebSocket.OPEN) {
+                 ws.send(JSON.stringify({type: "set_nickname", nickname: newNick}));
+             }
+         }
+     });
      addBtn("更换头像", () => avatarInput.click());
      addBtn("退出登录", () => {
          if (confirm("确定要退出登录吗？")) {
@@ -1189,8 +1198,10 @@ msgInput.addEventListener("focus", () => {
                     authSwitchBtn.innerText = "立即注册";
                 } else {
                     username = data.user;
+                    nickname = data.nickname || username;
                     userRole = data.role || "user";
                     localStorage.setItem("chat_username", username);
+                    localStorage.setItem("chat_nickname", nickname);
                     if (data.token) {
                         localStorage.setItem("chat_token", data.token);
                     }
@@ -1208,6 +1219,12 @@ msgInput.addEventListener("focus", () => {
 
             if (data.type === "code_sent") {
                 alert(data.text);
+                return;
+            }
+
+            if (data.type === "nickname_updated") {
+                nickname = data.nickname;
+                localStorage.setItem("chat_nickname", nickname);
                 return;
             }
 
@@ -1492,12 +1509,14 @@ function addMessage(data, prepend = false) {
 
     const name = document.createElement("div"); 
     name.className = "username"; 
+    const displayName = data.nickname || data.user;
     if (isPm) { 
-        name.innerText = isMe ? ("你 ➜ " + data.to + " (私聊)") : (data.from + " ➜ 你 (私聊)"); 
+        const fromName = data.fromNickname || data.from;
+        name.innerText = isMe ? ("你 ➜ " + data.to + " (私聊)") : (fromName + " ➜ 你 (私聊)"); 
     } else if (isMeAction) { 
-        name.innerText = data.user; 
+        name.innerText = displayName; 
     } else { 
-        name.innerText = data.user; 
+        name.innerText = displayName; 
     } 
     name.style.color = hashColor(sender || ""); 
     name.style.display = "flex"; 

@@ -1836,14 +1836,22 @@ function renderFriends() {
                 accept.innerText = "接受";
                 accept.onclick = (e) => {
                     e.stopPropagation();
-                    if (ws) ws.send(JSON.stringify({type: "respond_friend", target: f.username, action: "accept"}));
+                    if (ws) {
+                        item.style.opacity = "0.5";
+                        item.style.pointerEvents = "none";
+                        ws.send(JSON.stringify({type: "respond_friend", target: f.username, action: "accept"}));
+                    }
                 };
                 const reject = document.createElement("button");
                 reject.className = "actionBtn rejectBtn";
                 reject.innerText = "拒绝";
                 reject.onclick = (e) => {
                     e.stopPropagation();
-                    if (ws) ws.send(JSON.stringify({type: "respond_friend", target: f.username, action: "reject"}));
+                    if (ws) {
+                        item.style.opacity = "0.5";
+                        item.style.pointerEvents = "none";
+                        ws.send(JSON.stringify({type: "respond_friend", target: f.username, action: "reject"}));
+                    }
                 };
                 actions.appendChild(accept);
                 actions.appendChild(reject);
@@ -1978,10 +1986,12 @@ function renderMembers() {
         for (const m of list) {
             const item = document.createElement("div");
             item.className = "memberItem";
+            item.style.cursor = "pointer";
 
             const img = document.createElement("img");
             img.className = "memberAvatar";
             img.src = normalizeAvatar(m);
+            img.title = "点击添加好友";
             item.appendChild(img);
 
             const meta = document.createElement("div");
@@ -2014,6 +2024,17 @@ function renderMembers() {
             meta.appendChild(sub);
 
             item.appendChild(meta);
+            
+            // 点击成员项弹出添加好友提示
+            item.onclick = () => {
+                const targetUname = (m.username || "").trim();
+                if (targetUname && targetUname !== username) {
+                    if (confirm("确定要向 " + (m.nickname || targetUname) + " 发送好友申请吗？")) {
+                        if (ws) ws.send(JSON.stringify({type: "add_friend", target: targetUname}));
+                    }
+                }
+            };
+            
             frag.appendChild(item);
         }
     };

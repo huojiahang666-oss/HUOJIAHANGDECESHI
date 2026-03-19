@@ -64,7 +64,8 @@
         margin: 0 auto; 
         background: transparent; 
         overflow: hidden; 
-        will-change: height, top, bottom; 
+        transition: height 0.3s cubic-bezier(0.25, 0.1, 0.25, 1), top 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+        will-change: height, top; 
     } 
 
 /* 顶部 */ 
@@ -260,7 +261,8 @@
         background: rgba(255,255,255,0.98);
         z-index: 5000;
         overflow: hidden;
-        will-change: height, top, bottom;
+        transition: height 0.3s cubic-bezier(0.25, 0.1, 0.25, 1), top 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+        will-change: height, top;
     }
     
     .friendItem {
@@ -2467,54 +2469,56 @@ let lastHeight = 0;
 let lastOffsetTop = -1;
 
 function updateHeight() { 
-    const chat = document.getElementById("chat"); 
-    const main = document.getElementById("main"); 
-    const friendsPage = document.getElementById("friendsPage");
-    const privateChatPage = document.getElementById("privateChatPage");
-    const membersPage = document.getElementById("membersPage");
-    const inputArea = document.getElementById("inputArea");
-    const privateInputArea = document.getElementById("privateInputArea");
-    
     if (!window.visualViewport) return;
 
-    const { height, offsetTop } = window.visualViewport;
-    const viewportHeight = window.innerHeight;
-    const keyboardHeight = Math.max(0, viewportHeight - height - offsetTop);
-    
-    const wasNearBottom = (chat.scrollHeight - chat.scrollTop - chat.clientHeight) < 60; 
+    requestAnimationFrame(() => {
+        const chat = document.getElementById("chat"); 
+        const main = document.getElementById("main"); 
+        const friendsPage = document.getElementById("friendsPage");
+        const privateChatPage = document.getElementById("privateChatPage");
+        const membersPage = document.getElementById("membersPage");
+        const inputArea = document.getElementById("inputArea");
+        const privateInputArea = document.getElementById("privateInputArea");
+        
+        const { height, offsetTop } = window.visualViewport;
+        const viewportHeight = window.innerHeight;
+        const keyboardHeight = Math.max(0, viewportHeight - height - offsetTop);
+        
+        const wasNearBottom = (chat.scrollHeight - chat.scrollTop - chat.clientHeight) < 60; 
 
-    // 设置容器位置
-    const targets = [main, friendsPage, privateChatPage, membersPage];
-    targets.forEach(el => {
-        if (el) {
-            // 使用 bottom 避让键盘，top 锁定在顶部，这是最稳健的 mobile 布局方案
-            el.style.position = "fixed";
-            el.style.top = offsetTop + "px";
-            el.style.height = height + "px";
-            el.style.bottom = keyboardHeight + "px";
+        // 设置容器位置
+        const targets = [main, friendsPage, privateChatPage, membersPage];
+        targets.forEach(el => {
+            if (el) {
+                el.style.top = offsetTop + "px";
+                el.style.height = height + "px";
+            }
+        });
+
+        // 适配安全区
+        if (keyboardHeight > 1) {
+            if (inputArea) inputArea.style.paddingBottom = "0px";
+            if (privateInputArea) privateInputArea.style.paddingBottom = "0px";
+        } else {
+            // 延迟恢复安全区内边距，匹配键盘收回动画
+            setTimeout(() => {
+                if (window.visualViewport.offsetTop <= 0) {
+                    if (inputArea) inputArea.style.paddingBottom = "env(safe-area-inset-bottom)";
+                }
+            }, 300);
         }
-    });
 
-    // 适配安全区
-    if (keyboardHeight > 1) {
-        if (inputArea) inputArea.style.paddingBottom = "0px";
-        if (privateInputArea) privateInputArea.style.paddingBottom = "0px";
-    } else {
-        if (inputArea) inputArea.style.paddingBottom = "env(safe-area-inset-bottom)";
-    }
+        // 滚动对齐
+        if (wasNearBottom) {
+            chat.scrollTop = chat.scrollHeight;
+        }
+        if (activePrivateChat && privateChatList) {
+            privateChatList.scrollTop = privateChatList.scrollHeight;
+        }
 
-    // 滚动对齐
-    if (wasNearBottom) {
-        chat.scrollTop = chat.scrollHeight;
-    }
-    if (activePrivateChat && privateChatList) {
-        privateChatList.scrollTop = privateChatList.scrollHeight;
-    }
-
-    // 强制复位 body，防止系统由于键盘行为导致页面整体滚动
-    setTimeout(() => {
+        // 强制复位 body
         if (window.scrollY !== 0) window.scrollTo(0, 0);
-    }, 50);
+    });
 } 
 
 if (window.visualViewport) { 

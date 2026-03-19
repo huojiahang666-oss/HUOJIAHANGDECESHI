@@ -312,28 +312,199 @@ body {
     .deleteBtn:active { background: #fee2e2; }
     
     #privateChatHeader {
-        height: 50px;
+        height: 60px;
         display: flex;
         align-items: center;
-        padding: 0 12px;
-        background: rgba(15, 23, 42, 0.78);
-        color: white;
-        backdrop-filter: blur(12px);
+        padding: 0 16px;
+        background: rgba(255, 255, 255, 0.85);
+        color: #0f172a;
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border-bottom: 1px solid rgba(15, 23, 42, 0.05);
+        z-index: 10;
+        box-shadow: 0 4px 20px -10px rgba(0,0,0,0.05);
+    }
+    
+    .private-back-btn {
+        background: transparent;
+        border: none;
+        color: #3b82f6;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 8px 0;
+        margin-right: 12px;
+        transition: opacity 0.2s;
+    }
+    
+    .private-back-btn:active {
+        opacity: 0.6;
+    }
+
+    .private-header-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    #privateTitle {
+        font-weight: 700;
+        font-size: 16px;
+        color: #0f172a;
+        line-height: 1.2;
+    }
+
+    #privateStatus {
+        font-size: 11px;
+        color: #64748b;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 2px;
+    }
+    
+    .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #22c55e;
+    }
+    .status-dot.offline {
+        background: #94a3b8;
     }
     
     #privateChatList {
         flex: 1;
         overflow-y: auto;
-        padding: 16px;
+        padding: 20px 16px;
         background: #f8fafc;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
     }
     
+    /* 高级感输入区 */
     #privateInputArea {
-        padding: 10px;
+        padding: 12px 16px;
+        padding-bottom: calc(12px + env(safe-area-inset-bottom));
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-top: 1px solid rgba(15, 23, 42, 0.05);
         display: flex;
-        gap: 8px;
-        background: white;
-        border-top: 1px solid var(--border);
+        gap: 12px;
+        align-items: flex-end;
+    }
+
+    #privateMsgInput {
+        flex: 1;
+        background: #f1f5f9;
+        border: 1px solid transparent;
+        border-radius: 20px;
+        padding: 12px 16px;
+        font-size: 15px;
+        color: #0f172a;
+        outline: none;
+        transition: all 0.3s ease;
+        max-height: 100px;
+        line-height: 1.4;
+    }
+
+    #privateMsgInput:focus {
+        background: #ffffff;
+        border-color: #3b82f6;
+        box-shadow: 0 2px 12px rgba(59, 130, 246, 0.1);
+    }
+
+    #privateMsgInput::placeholder {
+        color: #94a3b8;
+    }
+
+    #privateSendBtn {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        color: white;
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        transition: transform 0.2s, box-shadow 0.2s;
+        flex-shrink: 0;
+    }
+
+    #privateSendBtn:active {
+        transform: scale(0.92);
+    }
+
+    /* 私聊气泡专项优化 */
+    .pm-message {
+        display: flex;
+        gap: 12px;
+        align-items: flex-end;
+        max-width: 85%;
+        animation: fadeIn 0.3s ease-out;
+    }
+
+    .pm-message.right {
+        align-self: flex-end;
+        flex-direction: row-reverse;
+    }
+
+    .pm-message.left {
+        align-self: flex-start;
+    }
+
+    .pm-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        object-fit: cover;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    .pm-content-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .pm-message.right .pm-content-wrapper {
+        align-items: flex-end;
+    }
+
+    .pm-bubble {
+        padding: 12px 16px;
+        font-size: 15px;
+        line-height: 1.5;
+        word-break: break-word;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+
+    .pm-message.left .pm-bubble {
+        background: #ffffff;
+        color: #0f172a;
+        border-radius: 18px 18px 18px 4px;
+        border: 1px solid rgba(15, 23, 42, 0.03);
+    }
+
+    .pm-message.right .pm-bubble {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        color: #ffffff;
+        border-radius: 18px 18px 4px 18px;
+    }
+
+    .pm-time {
+        font-size: 11px;
+        color: #94a3b8;
+        padding: 0 4px;
     }
 
     /* 消息弹窗 Toast */
@@ -971,13 +1142,24 @@ body {
 
      <div id="privateChatPage">
          <div id="privateChatHeader">
-             <button class="topBtn" id="privateBack">返回</button>
-             <div id="privateTitle" style="margin-left:12px;font-weight:600;">私聊</div>
+             <button class="private-back-btn" id="privateBack">
+                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                 返回
+             </button>
+             <div class="private-header-info">
+                 <div id="privateTitle">私聊</div>
+                 <div id="privateStatus">
+                     <div class="status-dot" id="privateStatusDot"></div>
+                     <span id="privateStatusText">在线</span>
+                 </div>
+             </div>
          </div>
          <div id="privateChatList"></div>
          <div id="privateInputArea">
-             <input id="privateMsgInput" placeholder="输入私信..." style="flex:1;padding:10px;border:1px solid #ddd;border-radius:12px;outline:none;">
-             <button id="privateSendBtn" style="width:70px;">发送</button>
+             <input id="privateMsgInput" placeholder="发消息..." autocomplete="off">
+             <button id="privateSendBtn">
+                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+             </button>
          </div>
      </div>
       <div id="toastContainer"></div>
@@ -2068,6 +2250,8 @@ const friendBadge = document.getElementById("friendBadge");
 const privateChatPage = document.getElementById("privateChatPage");
 const privateBack = document.getElementById("privateBack");
 const privateTitle = document.getElementById("privateTitle");
+const privateStatusDot = document.getElementById("privateStatusDot");
+const privateStatusText = document.getElementById("privateStatusText");
 const privateChatList = document.getElementById("privateChatList");
 const privateMsgInput = document.getElementById("privateMsgInput");
 const privateSendBtn = document.getElementById("privateSendBtn");
@@ -2209,7 +2393,18 @@ function openPrivateChat(target) {
     renderFriends();
     updateFriendBadge();
     
-    privateTitle.innerText = "与 " + target + " 的私聊";
+    // 更新头部信息
+    const friend = myFriends.find(f => f.username === target);
+    privateTitle.innerText = friend ? (friend.nickname || target) : target;
+    
+    if (friend) {
+        privateStatusDot.className = "status-dot" + (friend.online ? "" : " offline");
+        privateStatusText.innerText = friend.online ? "在线" : "离线";
+    } else {
+        privateStatusDot.className = "status-dot";
+        privateStatusText.innerText = "聊天中";
+    }
+
     privateChatPage.style.display = "flex";
     privateChatList.innerHTML = "";
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -2220,14 +2415,14 @@ function openPrivateChat(target) {
 function addPrivateMessage(data) {
     const isMe = data.from === username;
     const msg = document.createElement("div");
-    msg.className = "message " + (isMe ? "right" : "left");
+    msg.className = "pm-message " + (isMe ? "right" : "left");
     
     const avatarUrl = data.avatar || "https://api.dicebear.com/7.x/identicon/svg?seed=" + (data.from || "anon");
     
-    msg.innerHTML = `<img class="avatar" src="${avatarUrl}">
-                     <div class="msg_content">
-                        <div class="bubble">${data.text}</div>
-                        <div class="time">${data.time}</div>
+    msg.innerHTML = `<img class="pm-avatar" src="${avatarUrl}">
+                     <div class="pm-content-wrapper">
+                        <div class="pm-bubble">${data.text}</div>
+                        <div class="pm-time">${data.time}</div>
                      </div>`;
     privateChatList.appendChild(msg);
     privateChatList.scrollTop = privateChatList.scrollHeight;

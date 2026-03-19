@@ -3663,6 +3663,27 @@ function addSystem(text) {
          input.value = ""; 
          return; 
      } 
+    
+    if (text.startsWith("/deluser ")) { 
+        const u = text.slice(9).trim(); 
+        if (!u) { 
+            addSystem("用法: /deluser 用户名"); 
+            input.value = ""; 
+            return; 
+        } 
+        if (userRole !== "admin") { 
+            addSystem("只有管理员可以删除用户"); 
+            input.value = ""; 
+            return; 
+        } 
+        if (!confirm("确定删除用户 " + u + " 吗？此操作不可恢复。")) { 
+            input.value = ""; 
+            return; 
+        } 
+        ws.send(JSON.stringify({type: "command", cmd: "deluser", user: u})); 
+        input.value = ""; 
+        return; 
+    } 
  
      ws.send(JSON.stringify({text: text, replyTo: replyToId || undefined})); 
      input.value = ""; 

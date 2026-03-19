@@ -1220,11 +1220,14 @@ body {
             <button id="privateImageBtn" type="button" aria-label="发送图片">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L5 21"></path></svg>
             </button>
-             <input id="privateMsgInput" placeholder="发消息..." autocomplete="off">
-             <button id="privateSendBtn">
-                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-             </button>
-         </div>
+            <button id="privateVoiceBtn" type="button" aria-label="发送语音" style="background:none;border:none;padding:5px;cursor:pointer;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+            </button>
+            <input id="privateMsgInput" placeholder="发消息..." autocomplete="off">
+            <button id="privateSendBtn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            </button>
+        </div>
      </div>
       <div id="toastContainer"></div>
 
@@ -1247,9 +1250,10 @@ body {
      <div id="inputArea"> 
         <input id="msg" placeholder="输入消息..."> 
         <input type="file" id="imageInput" accept="image/*" style="display:none;"> 
-        <button id="imageToggle" style="width:70px;background:#eee;color:#333;">图片</button> 
-        <button id="emojiToggle" style="width:70px;background:#eee;color:#333;">表情</button> 
-        <button onclick="send()">发送</button> 
+        <button id="imageToggle" style="width:60px;background:#eee;color:#333;padding:0;font-size:13px;">图片</button> 
+        <button id="voiceToggle" style="width:60px;background:#eee;color:#333;padding:0;font-size:13px;">语音</button>
+        <button id="emojiToggle" style="width:60px;background:#eee;color:#333;padding:0;font-size:13px;">表情</button> 
+        <button onclick="send()" style="width:60px;padding:0;font-size:13px;">发送</button> 
     </div> 
  </div> 
 
@@ -1546,7 +1550,77 @@ function syncAuthModeUI() {
  const replyText = document.getElementById("replyText"); 
  const cancelReply = document.getElementById("cancelReply"); 
  const emojiPanel = document.getElementById("emojiPanel"); 
- const emojiToggle = document.getElementById("emojiToggle"); 
+ // 语音功能逻辑抽离
+    let mediaRecorder;
+    let audioChunks = [];
+    let isRecording = false;
+
+    async function handleVoiceRecording(btn, targetUser = null) {
+        if (!isRecording) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+                
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        const base64Audio = reader.result;
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                            if (targetUser) {
+                                ws.send(JSON.stringify({
+                                    type: "pm",
+                                    to: targetUser,
+                                    text: base64Audio,
+                                    msg_type: "voice"
+                                }));
+                            } else {
+                                ws.send(JSON.stringify({
+                                    type: "voice",
+                                    voice: base64Audio
+                                }));
+                            }
+                        }
+                    };
+                    reader.readAsDataURL(audioBlob);
+                    stream.getTracks().forEach(track => track.stop());
+                };
+                
+                mediaRecorder.start();
+                isRecording = true;
+                btn.dataset.oldHtml = btn.innerHTML;
+                btn.innerHTML = "停止";
+                btn.style.background = "#ff4444";
+                btn.style.color = "white";
+            } catch (err) {
+                console.error("录音失败:", err);
+                alert("无法访问麦克风，请检查浏览器权限。");
+            }
+        } else {
+            mediaRecorder.stop();
+            isRecording = false;
+            btn.innerHTML = btn.dataset.oldHtml || "语音";
+            btn.style.background = "";
+            btn.style.color = "";
+        }
+    }
+
+    const voiceToggle = document.getElementById("voiceToggle");
+    voiceToggle.addEventListener("click", () => handleVoiceRecording(voiceToggle));
+
+    const privateVoiceBtn = document.getElementById("privateVoiceBtn");
+    privateVoiceBtn.addEventListener("click", () => {
+        if (activePrivateChat) {
+            handleVoiceRecording(privateVoiceBtn, activePrivateChat);
+        }
+    });
+
+    const emojiToggle = document.getElementById("emojiToggle"); 
 const imageToggle = document.getElementById("imageToggle"); 
 const imageInput = document.getElementById("imageInput"); 
 const onlineCountOverlayText = document.getElementById("onlineCountOverlayText");
@@ -2591,6 +2665,22 @@ function addPrivateMessage(data) {
             document.body.appendChild(overlay);
         };
         bubble.appendChild(img);
+    } else if (data.msg_type === "voice" || (typeof data.text === "string" && data.text.startsWith("data:audio/"))) {
+        const voiceBtn = document.createElement("div");
+        voiceBtn.style.cursor = "pointer";
+        voiceBtn.style.color = isMe ? "white" : "var(--accent)";
+        voiceBtn.style.display = "flex";
+        voiceBtn.style.alignItems = "center";
+        voiceBtn.style.gap = "8px";
+        voiceBtn.innerHTML = `<span>🎤</span> <span>[语音消息 - 点击播放]</span>`;
+        voiceBtn.onclick = () => {
+            const audio = new Audio(data.text);
+            audio.play().catch(err => {
+                console.error("播放失败:", err);
+                alert("播放失败，请检查浏览器权限");
+            });
+        };
+        bubble.appendChild(voiceBtn);
     } else {
         bubble.innerText = data.text || "";
     }
@@ -3137,6 +3227,22 @@ function addMessage(data, prepend = false) {
             document.body.appendChild(overlay); 
         }; 
         bubble.appendChild(img); 
+    } else if (data.type === "voice") {
+        const voiceBtn = document.createElement("div");
+        voiceBtn.style.cursor = "pointer";
+        voiceBtn.style.color = isMe ? "white" : "var(--accent)";
+        voiceBtn.style.display = "flex";
+        voiceBtn.style.alignItems = "center";
+        voiceBtn.style.gap = "8px";
+        voiceBtn.innerHTML = `<span>🎤</span> <span>[语音消息 - 点击播放]</span>`;
+        voiceBtn.onclick = () => {
+            const audio = new Audio(data.voice);
+            audio.play().catch(err => {
+                console.error("播放失败:", err);
+                alert("播放失败，请检查浏览器权限");
+            });
+        };
+        bubble.appendChild(voiceBtn);
     } else { 
         bubble.innerText = (data.type === "me" ? (sender + " " + text) : text); 
     } 

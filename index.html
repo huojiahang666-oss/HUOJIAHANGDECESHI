@@ -312,6 +312,8 @@
     
     .acceptBtn { background: var(--accent-2); color: white; }
     .rejectBtn { background: #ef4444; color: white; }
+    .deleteBtn { background: #f1f5f9; color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.1); }
+    .deleteBtn:active { background: #fee2e2; }
     
     #privateChatHeader {
         height: 50px;
@@ -1835,6 +1837,19 @@ function renderFriends() {
                 item.appendChild(status);
             }
         } else {
+            const actions = document.createElement("div");
+            actions.className = "requestActions";
+            const del = document.createElement("button");
+            del.className = "actionBtn deleteBtn";
+            del.innerText = "删除";
+            del.onclick = (e) => {
+                e.stopPropagation();
+                if (confirm("确定要删除好友 " + f.nickname + " 吗？")) {
+                    if (ws) ws.send(JSON.stringify({type: "delete_friend", target: f.username}));
+                }
+            };
+            actions.appendChild(del);
+            item.appendChild(actions);
             item.onclick = () => openPrivateChat(f.username);
         }
         

@@ -1715,11 +1715,8 @@ imageInput.addEventListener("change", (e) => {
     // 移除导致抖动的强制滚动
     updateHeight(); 
 }); 
-msgInput.addEventListener("focus", (e) => { 
+msgInput.addEventListener("focus", () => { 
     updateHeight();
-    setTimeout(() => {
-        e.target.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    }, 100);
 }); 
  
  let ws; 
@@ -2271,11 +2268,8 @@ privateSendBtn.addEventListener("click", () => {
     }
 });
 
-privateMsgInput.addEventListener("focus", (e) => {
+privateMsgInput.addEventListener("focus", () => {
     updateHeight();
-    setTimeout(() => {
-        e.target.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    }, 100);
 });
 
 privateMsgInput.addEventListener("blur", () => {
@@ -2474,10 +2468,17 @@ function updateHeight() {
     const inputArea = document.getElementById("inputArea");
     const privateInputArea = document.getElementById("privateInputArea");
     
-    // 放弃 visualViewport，直接使用 window.innerHeight，这是兼容性最强的方式
-    const currentHeight = window.innerHeight;
+    // 获取当前视口高度
+    let currentHeight = window.innerHeight;
+    
+    // 如果支持 visualViewport，优先使用它以获得更准确的键盘高度
+    if (window.visualViewport) {
+        currentHeight = window.visualViewport.height;
+    }
+
     const hStr = currentHeight + "px";
     
+    // 只设置 height，不碰 top 或 bottom，让 Flexbox 自然压缩中间的聊天区域
     const targets = [main, friendsPage, privateChatPage, membersPage];
     targets.forEach(el => {
         if (el) {
@@ -2485,17 +2486,19 @@ function updateHeight() {
         }
     });
 
-    // 假设高度变小意味着键盘弹出
+    // 假设高度小于屏幕的 80% 意味着键盘弹出
     const keyboardActive = currentHeight < window.screen.height * 0.8;
 
     if (keyboardActive) {
+        // 键盘弹出时，移除底部安全区，防止输入框被顶得太高
         if (inputArea) inputArea.style.paddingBottom = "0px";
         if (privateInputArea) privateInputArea.style.paddingBottom = "0px";
         
-        // 键盘弹出时，滚动到底部
+        // 自动滚动到最新消息
         if (chat) chat.scrollTop = chat.scrollHeight;
         if (activePrivateChat && privateChatList) privateChatList.scrollTop = privateChatList.scrollHeight;
     } else {
+        // 键盘收起时，恢复底部安全区
         if (inputArea) inputArea.style.paddingBottom = "env(safe-area-inset-bottom)";
     }
 } 

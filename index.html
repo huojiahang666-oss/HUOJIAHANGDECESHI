@@ -21,9 +21,11 @@
  } 
  html, body { 
     height: 100%; 
+    width: 100%;
     overflow: hidden; 
     overscroll-behavior: none; 
-    background-color: #0b1220; /* 强制背景色，消除空白闪烁 */
+    background-color: #0b1220; 
+    position: fixed; /* 极致锁定 */
 } 
  
  body { 
@@ -50,21 +52,20 @@
  
  /* 主区域 */ 
 #main { 
-    position: fixed; 
-    top: 0; /* 恢复顶部固定，这是最稳定的定位方式 */
-    left: 0; 
-    right: 0; 
-    display: flex; 
-    flex-direction: column; 
-    width: 100%; 
-    max-width: 980px; 
-    margin: 0 auto; 
-    background: transparent; 
-    height: 100vh; 
-    height: 100dvh; 
-    overflow: hidden; 
-    will-change: height, top; 
-} 
+        position: absolute; /* 改为 absolute，配合 visualViewport 使用更稳定 */
+        top: 0;
+        left: 0; 
+        right: 0; 
+        display: flex; 
+        flex-direction: column; 
+        width: 100%; 
+        max-width: 980px; 
+        margin: 0 auto; 
+        background: transparent; 
+        height: 100dvh; 
+        overflow: hidden; 
+        will-change: height, top; 
+    } 
 
 /* 顶部 */ 
 #topBar { 
@@ -252,7 +253,7 @@
     }
     
     #friendsPage, #privateChatPage {
-        position: fixed;
+        position: absolute; /* 改为 absolute 增强 mobile 兼容性 */
         inset: 0;
         display: none;
         flex-direction: column;
@@ -2471,6 +2472,7 @@ function updateHeight() {
     const main = document.getElementById("main"); 
     const friendsPage = document.getElementById("friendsPage");
     const privateChatPage = document.getElementById("privateChatPage");
+    const membersPage = document.getElementById("membersPage");
     const inputArea = document.getElementById("inputArea");
     const privateInputArea = document.getElementById("privateInputArea");
     const wasNearBottom = (chat.scrollHeight - chat.scrollTop - chat.clientHeight) < 60; 
@@ -2481,14 +2483,15 @@ function updateHeight() {
         // 当 offsetTop 为 0 时，说明键盘已收起，立即恢复满屏状态，消除空白闪烁
         if (offsetTop <= 0) {
             const fullHeight = "100dvh";
-            main.style.height = fullHeight; 
-            main.style.top = "0px";
-            friendsPage.style.height = fullHeight;
-            friendsPage.style.top = "0px";
-            privateChatPage.style.height = fullHeight;
-            privateChatPage.style.top = "0px";
+            const targets = [main, friendsPage, privateChatPage, membersPage];
+            targets.forEach(el => {
+                if (el) {
+                    el.style.height = fullHeight;
+                    el.style.top = "0px";
+                }
+            });
             if (inputArea) inputArea.style.paddingBottom = "env(safe-area-inset-bottom)";
-            if (privateInputArea) privateInputArea.style.paddingBottom = "0px"; // 私聊默认无额外边距
+            if (privateInputArea) privateInputArea.style.paddingBottom = "0px";
             lastHeight = 0;
             lastOffsetTop = 0;
         } else {
@@ -2496,12 +2499,14 @@ function updateHeight() {
             if (Math.abs(lastHeight - height) > 1 || Math.abs(lastOffsetTop - offsetTop) > 1) {
                 const hStr = height + "px";
                 const tStr = offsetTop + "px";
-                main.style.height = hStr; 
-                main.style.top = tStr; 
-                friendsPage.style.height = hStr;
-                friendsPage.style.top = tStr;
-                privateChatPage.style.height = hStr;
-                privateChatPage.style.top = tStr;
+                const targets = [main, friendsPage, privateChatPage, membersPage];
+                targets.forEach(el => {
+                    if (el) {
+                        el.style.height = hStr;
+                        el.style.top = tStr;
+                    }
+                });
+                
                 // 键盘弹出时移除安全区内边距，避免输入框被推得太高
                 if (inputArea) inputArea.style.paddingBottom = "0px";
                 if (privateInputArea) privateInputArea.style.paddingBottom = "0px";
@@ -2524,15 +2529,16 @@ function updateHeight() {
             if (window.scrollY !== 0) {
                 window.scrollTo(0, 0);
             }
-        }, 20);
+        }, 50); // 稍微增加延迟，让滚动更彻底
     } else { 
         const fullHeight = "100dvh";
-        main.style.height = fullHeight; 
-        main.style.top = "0px";
-        friendsPage.style.height = fullHeight;
-        friendsPage.style.top = "0px";
-        privateChatPage.style.height = fullHeight;
-        privateChatPage.style.top = "0px";
+        const targets = [main, friendsPage, privateChatPage, membersPage];
+        targets.forEach(el => {
+            if (el) {
+                el.style.height = fullHeight;
+                el.style.top = "0px";
+            }
+        });
     } 
 } 
 

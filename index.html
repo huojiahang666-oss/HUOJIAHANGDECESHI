@@ -339,6 +339,92 @@
         background: white;
         border-top: 1px solid var(--border);
     }
+
+    /* 消息弹窗 Toast */
+    #toastContainer {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10001;
+        pointer-events: none;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: 90%;
+        max-width: 340px;
+    }
+
+    .toast {
+        background: rgba(15, 23, 42, 0.9);
+        color: white;
+        padding: 12px 16px;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        animation: toastIn 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards, toastOut 0.4s ease 2.6s forwards;
+        pointer-events: auto;
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .toast-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+
+    .toast-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .toast-user {
+        font-size: 12px;
+        font-weight: 600;
+        opacity: 0.8;
+    }
+
+    .toast-text {
+        font-size: 14px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    @keyframes toastIn {
+        from { transform: translateY(-40px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+
+    @keyframes toastOut {
+        from { transform: translateY(0); opacity: 1; }
+        to { transform: translateY(-20px); opacity: 0; }
+    }
+
+    /* 未读消息气泡 */
+    .unread-badge {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        background: #ef4444;
+        color: white;
+        font-size: 10px;
+        font-weight: 700;
+        min-width: 18px;
+        height: 18px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid white;
+        padding: 0 4px;
+        box-sizing: border-box;
+    }
  
  #searchInput { 
      height: 26px; 
@@ -723,7 +809,9 @@
              <button id="privateSendBtn" style="width:70px;">发送</button>
          </div>
      </div>
-      <div id="chat"> 
+      <div id="toastContainer"></div>
+
+     <div id="chat"> 
          <div id="loadMore" class="loadMore"> 
              <button class="loadMoreBtn" onclick="loadMoreHistory()">查看更多历史消息</button> 
          </div> 
@@ -1454,6 +1542,7 @@ let latestMembersRoom = "";
 let myFriends = [];
 let activePrivateChat = null;
 let unreadRequests = 0;
+let unreadPrivateMsgs = {}; // { username: count }
  function forceLogout(text) {
      forcedLogout = true;
      shouldReconnect = false;
@@ -1572,7 +1661,13 @@ let unreadRequests = 0;
                 if (activePrivateChat === otherUser) {
                     addPrivateMessage(data);
                 } else if (!isFromMe) {
-                    addSystem("收到来自 " + data.from + " 的私信: " + data.text);
+                    // 记录未读消息
+                    unreadPrivateMsgs[otherUser] = (unreadPrivateMsgs[otherUser] || 0) + 1;
+                    renderFriends(); // 更新好友列表中的气泡
+                    updateFriendBadge(); // 更新顶部好友按钮的红点
+                    
+                    // 显示 Toast 弹窗
+                    showToast(data.from, data.text);
                 }
                 return;
             }
@@ -1802,11 +1897,44 @@ const privateSendBtn = document.getElementById("privateSendBtn");
 
 function updateFriendBadge() {
     const pending = myFriends.filter(f => f.status === "pending" && !f.is_requester).length;
-    if (pending > 0) {
+    const unreadMsgs = Object.values(unreadPrivateMsgs).reduce((a, b) => a + b, 0);
+    
+    if (pending > 0 || unreadMsgs > 0) {
         friendBadge.style.display = "block";
     } else {
         friendBadge.style.display = "none";
     }
+}
+
+function showToast(sender, text) {
+    const container = document.getElementById("toastContainer");
+    const toast = document.createElement("div");
+    toast.className = "toast";
+    
+    // 获取好友昵称
+    const friend = myFriends.find(f => f.username === sender);
+    const displayName = friend ? friend.nickname : sender;
+    const avatarSrc = friend && friend.avatar ? friend.avatar : "https://api.dicebear.com/7.x/identicon/svg?seed=" + sender;
+
+    toast.innerHTML = `
+        <img class="toast-avatar" src="${avatarSrc}">
+        <div class="toast-content">
+            <div class="toast-user">${displayName}</div>
+            <div class="toast-text">${text}</div>
+        </div>
+    `;
+    
+    toast.onclick = () => {
+        openPrivateChat(sender);
+        toast.remove();
+    };
+    
+    container.appendChild(toast);
+    
+    // 3秒后移除 (动画结束后)
+    setTimeout(() => {
+        if (toast.parentNode) toast.remove();
+    }, 3000);
 }
 
 function renderFriends() {
@@ -1815,16 +1943,30 @@ function renderFriends() {
         const item = document.createElement("div");
         item.className = "friendItem";
         
+        const avatarWrapper = document.createElement("div");
+        avatarWrapper.style.position = "relative";
+
         const avatar = document.createElement("img");
         avatar.className = "friendAvatar" + (f.online ? "" : " offline");
         avatar.src = f.avatar || "https://api.dicebear.com/7.x/identicon/svg?seed=" + f.username;
         
+        avatarWrapper.appendChild(avatar);
+
+        // 未读消息气泡
+        const unreadCount = unreadPrivateMsgs[f.username] || 0;
+        if (unreadCount > 0) {
+            const badge = document.createElement("div");
+            badge.className = "unread-badge";
+            badge.innerText = unreadCount > 99 ? "99+" : unreadCount;
+            avatarWrapper.appendChild(badge);
+        }
+
         const info = document.createElement("div");
         info.className = "friendInfo";
         info.innerHTML = `<div class="friendName">${f.nickname} (${f.username})</div>
                           <div class="friendStatus">${f.online ? "在线" : "离线"}</div>`;
         
-        item.appendChild(avatar);
+        item.appendChild(avatarWrapper);
         item.appendChild(info);
         
         if (f.status === "pending") {
@@ -1885,6 +2027,11 @@ function renderFriends() {
 
 function openPrivateChat(target) {
     activePrivateChat = target;
+    // 清除未读消息
+    delete unreadPrivateMsgs[target];
+    renderFriends();
+    updateFriendBadge();
+    
     privateTitle.innerText = "与 " + target + " 的私聊";
     privateChatPage.style.display = "flex";
     privateChatList.innerHTML = "";

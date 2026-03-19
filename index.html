@@ -1183,6 +1183,30 @@ msgInput.addEventListener("focus", () => {
  
  let ws; 
  let shouldReconnect = true; 
+ let forcedLogout = false;
+ function forceLogout(text) {
+     forcedLogout = true;
+     shouldReconnect = false;
+     try {
+         if (text) {
+             addSystem(text);
+         }
+     } catch {}
+     localStorage.removeItem("chat_token");
+     localStorage.removeItem("chat_username");
+     localStorage.removeItem("chat_nickname");
+     localStorage.removeItem("chat_avatar");
+     roomKey = "";
+     roomId = null;
+     isLockedRoom = false;
+     try {
+         if (ws) ws.close();
+     } catch {}
+     authModal.style.display = "flex";
+     try {
+         location.search = "?room=lobby";
+     } catch {}
+ }
  function connect() { 
      ws = new WebSocket("wss://ducally-chemiluminescent-zenaida.ngrok-free.dev"); 
  
@@ -1236,6 +1260,11 @@ msgInput.addEventListener("focus", () => {
             if (data.type === "nickname_updated") {
                 nickname = data.nickname;
                 localStorage.setItem("chat_nickname", nickname);
+                return;
+            }
+
+            if (data.type === "force_logout") {
+                forceLogout(data.text || "你已退出登录");
                 return;
             }
 
@@ -1304,18 +1333,10 @@ msgInput.addEventListener("focus", () => {
  
          if (data.type === "kicked") { 
             const kickedMsg = data.text || "你已被踢出房间"; 
-            addSystem(kickedMsg); 
             try { 
                 alert(kickedMsg); 
             } catch {} 
-             shouldReconnect = false; 
-             try { 
-                 if (ws) ws.close(); 
-             } catch {} 
-             roomKey = ""; 
-             roomId = null; 
-             isLockedRoom = false; 
-             location.search = "?room=lobby"; 
+            forceLogout(kickedMsg);
              return; 
          } 
  
@@ -1369,11 +1390,16 @@ msgInput.addEventListener("focus", () => {
          addSystem("连接失败"); 
      }; 
  
-     ws.onclose = () => { 
+     ws.onclose = (e) => { 
+         if (e && e.code === 4003) {
+             forceLogout((e.reason || "").trim() || "你已被踢出并退出登录");
+             return;
+         }
+         if (!shouldReconnect || forcedLogout) {
+             return;
+         }
          addSystem("连接断开，正在重连..."); 
-         if (shouldReconnect) { 
-             setTimeout(connect, 1000); 
-         } 
+         setTimeout(connect, 1000); 
      }; 
  } 
  connect(); 

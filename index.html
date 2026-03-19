@@ -1098,7 +1098,7 @@
  // 为登录注册输入框添加防遮挡处理
 [authUser, authPass, authEmail, authCode].forEach(input => {
     input.addEventListener('focus', () => {
-        setTimeout(updateHeight, 100);
+        updateHeight();
     });
 });
 
@@ -1715,10 +1715,7 @@ imageInput.addEventListener("change", (e) => {
     updateHeight(); 
 }); 
 msgInput.addEventListener("focus", () => { 
-    setTimeout(() => {
-        updateHeight();
-        chat.scrollTop = chat.scrollHeight;
-    }, 100);
+    updateHeight();
 }); 
  
  let ws; 
@@ -2271,10 +2268,7 @@ privateSendBtn.addEventListener("click", () => {
 });
 
 privateMsgInput.addEventListener("focus", () => {
-    setTimeout(() => {
-        updateHeight();
-        privateChatList.scrollTop = privateChatList.scrollHeight;
-    }, 100);
+    updateHeight();
 });
 
 privateMsgInput.addEventListener("blur", () => {
@@ -2464,67 +2458,61 @@ document.getElementById("exitRoom").addEventListener("click", () => {
 let lastHeight = 0;
 let lastOffsetTop = -1;
 
+let lastUpdateHeight = 0;
+let lastUpdateOffset = 0;
+
 function updateHeight() { 
     if (!window.visualViewport) return;
 
-    // 使用 requestAnimationFrame 确保布局更新与浏览器渲染帧同步，消除抖动
-    requestAnimationFrame(() => {
-        const chat = document.getElementById("chat"); 
-        const main = document.getElementById("main"); 
-        const friendsPage = document.getElementById("friendsPage");
-        const privateChatPage = document.getElementById("privateChatPage");
-        const membersPage = document.getElementById("membersPage");
-        const inputArea = document.getElementById("inputArea");
-        const privateInputArea = document.getElementById("privateInputArea");
-        
-        const { height, offsetTop } = window.visualViewport;
-        const viewportHeight = window.innerHeight;
-        
-        // 键盘活跃判断：基于视口偏移或高度显著缩小
-        const keyboardActive = offsetTop > 10 || height < (viewportHeight - 40);
-        
-        const wasNearBottom = (chat.scrollHeight - chat.scrollTop - chat.clientHeight) < 60; 
+    const { height, offsetTop } = window.visualViewport;
+    if (Math.abs(height - lastUpdateHeight) < 1 && Math.abs(offsetTop - lastUpdateOffset) < 1) return;
+    
+    lastUpdateHeight = height;
+    lastUpdateOffset = offsetTop;
 
-        // 统一设置容器位置和高度，使用 fixed 定位下的 top/height 配合是目前移动端最稳健的方案
-        const targets = [main, friendsPage, privateChatPage, membersPage];
-        targets.forEach(el => {
-            if (el) {
-                if (keyboardActive) {
-                    el.style.top = offsetTop + "px";
-                    el.style.height = height + "px";
-                } else {
-                    // 键盘关闭时，重置为 100dvh 并清空 top 偏移，恢复默认布局
-                    el.style.top = "0px";
-                    el.style.height = "100dvh";
-                }
+    const chat = document.getElementById("chat"); 
+    const main = document.getElementById("main"); 
+    const friendsPage = document.getElementById("friendsPage");
+    const privateChatPage = document.getElementById("privateChatPage");
+    const membersPage = document.getElementById("membersPage");
+    const inputArea = document.getElementById("inputArea");
+    const privateInputArea = document.getElementById("privateInputArea");
+    
+    const viewportHeight = window.innerHeight;
+    const keyboardActive = offsetTop > 10 || height < (viewportHeight - 40);
+    
+    const targets = [main, friendsPage, privateChatPage, membersPage];
+    targets.forEach(el => {
+        if (el) {
+            if (keyboardActive) {
+                el.style.top = offsetTop + "px";
+                el.style.height = height + "px";
+            } else {
+                el.style.top = "";
+                el.style.height = "";
             }
-        });
-
-        // 键盘活跃时，移除底部安全区边距，防止输入框位置过高
-        if (keyboardActive) {
-            if (inputArea) inputArea.style.paddingBottom = "0px";
-            if (privateInputArea) privateInputArea.style.paddingBottom = "0px";
-        } else {
-            // 键盘收起时，恢复安全区内边距以适配全面屏
-            if (inputArea) inputArea.style.paddingBottom = "env(safe-area-inset-bottom)";
-            if (privateInputArea) privateInputArea.style.paddingBottom = "0px";
         }
+    });
 
-        // 滚动状态同步
-        if (wasNearBottom) {
+    if (keyboardActive) {
+        if (inputArea) inputArea.style.paddingBottom = "0px";
+        if (privateInputArea) privateInputArea.style.paddingBottom = "0px";
+    } else {
+        if (inputArea) inputArea.style.paddingBottom = "env(safe-area-inset-bottom)";
+    }
+
+    if (keyboardActive) {
+        if (chat && (chat.scrollHeight - chat.scrollTop - chat.clientHeight) < 100) {
             chat.scrollTop = chat.scrollHeight;
         }
         if (activePrivateChat && privateChatList) {
             privateChatList.scrollTop = privateChatList.scrollHeight;
         }
+    }
 
-        // 核心：强制 body 复位。使用更短的延迟以消除页面拉扯
-        setTimeout(() => {
-            if (window.scrollY !== 0) {
-                window.scrollTo(0, 0);
-            }
-        }, 10);
-    });
+    if (window.scrollY !== 0) {
+        window.scrollTo(0, 0);
+    }
 } 
 
 if (window.visualViewport) { 

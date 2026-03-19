@@ -2,7 +2,7 @@
  <html lang="zh"> 
  <head> 
  <meta charset="UTF-8"> 
- <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"> 
+ <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"> 
  <title>聊天室</title> 
  
  <style> 
@@ -56,15 +56,14 @@
         top: 0;
         left: 0; 
         right: 0; 
-        bottom: 0;
         display: flex; 
         flex-direction: column; 
         width: 100%; 
         max-width: 980px; 
         margin: 0 auto; 
         background: transparent; 
+        height: 100dvh;
         overflow: hidden; 
-        will-change: bottom; 
     } 
 
 /* 顶部 */ 
@@ -257,13 +256,12 @@
         top: 0;
         left: 0;
         right: 0;
-        bottom: 0;
+        height: 100dvh;
         display: none;
         flex-direction: column;
         background: rgba(255,255,255,0.98);
         z-index: 5000;
         overflow: hidden;
-        will-change: bottom;
     }
     
     .friendItem {
@@ -1717,8 +1715,11 @@ imageInput.addEventListener("change", (e) => {
     // 移除导致抖动的强制滚动
     updateHeight(); 
 }); 
-msgInput.addEventListener("focus", () => { 
+msgInput.addEventListener("focus", (e) => { 
     updateHeight();
+    setTimeout(() => {
+        e.target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 100);
 }); 
  
  let ws; 
@@ -2270,8 +2271,11 @@ privateSendBtn.addEventListener("click", () => {
     }
 });
 
-privateMsgInput.addEventListener("focus", () => {
+privateMsgInput.addEventListener("focus", (e) => {
     updateHeight();
+    setTimeout(() => {
+        e.target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 100);
 });
 
 privateMsgInput.addEventListener("blur", () => {
@@ -2462,17 +2466,6 @@ let lastHeight = 0;
 let lastOffsetTop = -1;
 
 function updateHeight() { 
-    if (!window.visualViewport) return;
-
-    const { height, offsetTop } = window.visualViewport;
-    const viewportHeight = window.innerHeight;
-    
-    // 计算键盘高度：视口总高度减去当前可见高度
-    const keyboardHeight = Math.max(0, viewportHeight - height);
-    
-    if (Math.abs(keyboardHeight - lastUpdateHeight) < 1) return;
-    lastUpdateHeight = keyboardHeight;
-
     const chat = document.getElementById("chat"); 
     const main = document.getElementById("main"); 
     const friendsPage = document.getElementById("friendsPage");
@@ -2481,35 +2474,34 @@ function updateHeight() {
     const inputArea = document.getElementById("inputArea");
     const privateInputArea = document.getElementById("privateInputArea");
     
-    const keyboardActive = keyboardHeight > 40;
+    // 放弃 visualViewport，直接使用 window.innerHeight，这是兼容性最强的方式
+    const currentHeight = window.innerHeight;
+    const hStr = currentHeight + "px";
     
-    // 统一调整 bottom 属性来避让键盘，top 始终固定为 0
     const targets = [main, friendsPage, privateChatPage, membersPage];
     targets.forEach(el => {
         if (el) {
-            el.style.bottom = keyboardHeight + "px";
+            el.style.height = hStr;
         }
     });
+
+    // 假设高度变小意味着键盘弹出
+    const keyboardActive = currentHeight < window.screen.height * 0.8;
 
     if (keyboardActive) {
         if (inputArea) inputArea.style.paddingBottom = "0px";
         if (privateInputArea) privateInputArea.style.paddingBottom = "0px";
         
-        // 键盘弹出时，强制滚动到底部
+        // 键盘弹出时，滚动到底部
         if (chat) chat.scrollTop = chat.scrollHeight;
         if (activePrivateChat && privateChatList) privateChatList.scrollTop = privateChatList.scrollHeight;
     } else {
         if (inputArea) inputArea.style.paddingBottom = "env(safe-area-inset-bottom)";
     }
-
-    // 彻底解决下拉问题：强制复位 window 滚动
-    window.scrollTo(0, 0);
 } 
 
-// 监听滚动事件，防止任何形式的页面下拉
-window.addEventListener('scroll', () => {
-    if (window.scrollY !== 0) window.scrollTo(0, 0);
-}, { passive: true });
+// 移除可能引起冲突的强制滚动事件
+// window.addEventListener('scroll', () => { ... });
 
 if (window.visualViewport) { 
     window.visualViewport.addEventListener("resize", updateHeight); 

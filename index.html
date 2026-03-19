@@ -1331,24 +1331,34 @@ function updateHeight() {
     if (window.visualViewport) { 
         const { height, offsetTop } = window.visualViewport; 
         
-        // 同步更新 top 和 height，确保 #main 始终精准覆盖可视区域
-        if (Math.abs(lastHeight - height) > 1 || Math.abs(lastOffsetTop - offsetTop) > 1) {
-            main.style.height = height + "px"; 
-            main.style.top = offsetTop + "px"; 
-            lastHeight = height;
-            lastOffsetTop = offsetTop;
-            
-            if (wasNearBottom) {
-                chat.scrollTop = chat.scrollHeight;
+        // 当 offsetTop 为 0 时，说明键盘已收起，立即恢复满屏状态，消除空白闪烁
+        if (offsetTop <= 0) {
+            main.style.height = "100dvh"; 
+            main.style.top = "0px";
+            lastHeight = 0;
+            lastOffsetTop = 0;
+        } else {
+            // 同步更新 top 和 height，确保 #main 始终精准覆盖可视区域
+            if (Math.abs(lastHeight - height) > 1 || Math.abs(lastOffsetTop - offsetTop) > 1) {
+                main.style.height = height + "px"; 
+                main.style.top = offsetTop + "px"; 
+                lastHeight = height;
+                lastOffsetTop = offsetTop;
             }
         }
         
-        // 核心：强制 body 回位，防止 iOS 将整个 body 顶起
-        if (window.scrollY !== 0) {
-            window.scrollTo(0, 0);
+        if (wasNearBottom) {
+            chat.scrollTop = chat.scrollHeight;
         }
+        
+        // 核心：强制 body 回位，使用延时确保在系统行为之后触发
+        setTimeout(() => {
+            if (window.scrollY !== 0) {
+                window.scrollTo(0, 0);
+            }
+        }, 20);
     } else { 
-        main.style.height = window.innerHeight + "px"; 
+        main.style.height = "100dvh"; 
         main.style.top = "0px";
     } 
 } 

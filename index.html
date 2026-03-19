@@ -137,7 +137,7 @@
  } 
  
  .topBtn:active { 
-     transform: translateY(1px); 
+     opacity: 0.8;
  } 
  
  .msgActionBtn { 
@@ -159,6 +159,7 @@
      justify-content: center; 
      background: rgba(2, 6, 23, 0.50); 
      z-index: 9999; 
+     overscroll-behavior: contain;
  } 
  
  #actionSheetPanel { 
@@ -206,6 +207,7 @@
     flex: 1; 
     overflow-y: auto; 
     overscroll-behavior-y: contain; 
+    -webkit-overflow-scrolling: touch; /* 增强 iOS 滚动 */
     padding: 14px; 
     box-sizing: border-box; 
     margin: 12px 10px 12px 10px; 
@@ -214,6 +216,9 @@
     border: 1px solid var(--border); 
     border-radius: 18px; 
     box-shadow: var(--shadow-soft); 
+    /* 避免点击时的布局抖动 */
+    transform: translateZ(0);
+    -webkit-user-drag: none;
 } 
  
  /* 消息 */ 
@@ -426,7 +431,7 @@
  } 
  
  button:active { 
-     transform: translateY(1px); 
+     opacity: 0.8;
  } 
  </style> 
  </head> 
@@ -895,10 +900,17 @@ imageInput.addEventListener("change", (e) => {
  
  function updateTopBar(countText, typingText) { 
     const title = "聊天室" + (isLockedRoom ? " 🔒" : "") + (countText ? (" · " + countText) : ""); 
-    document.getElementById("roomTitle").innerText = title; 
+    const titleEl = document.getElementById("roomTitle");
+    if (titleEl.innerText !== title) titleEl.innerText = title;
+    
     const ownerHint = isLockedRoom && ownerName ? (" | 房主:" + ownerName + (isOwner ? "(你)" : "")) : ""; 
-    document.getElementById("typing").innerText = typingText || (ownerHint ? ownerHint.slice(3) : ""); 
-    document.getElementById("exitRoom").style.display = isLockedRoom ? "" : "none"; 
+    const t = typingText || (ownerHint ? ownerHint.slice(3) : "");
+    const typingEl = document.getElementById("typing");
+    if (typingEl.innerText !== t) typingEl.innerText = t;
+    
+    const exitBtn = document.getElementById("exitRoom");
+    const d = isLockedRoom ? "" : "none";
+    if (exitBtn.style.display !== d) exitBtn.style.display = d;
 } 
  updateTopBar("", ""); 
  let lastCountText = ""; 
@@ -1305,6 +1317,9 @@ document.getElementById("exitRoom").addEventListener("click", () => {
  
  /* ✅ 终极防遮挡 - 优化抖动版 */ 
 let updateHeightPending = false; 
+let lastHeight = 0;
+let lastOffsetTop = 0;
+
 function updateHeight() { 
     if (updateHeightPending) return; 
     updateHeightPending = true; 
@@ -1316,10 +1331,15 @@ function updateHeight() {
 
         if (window.visualViewport) { 
             const { height, offsetTop } = window.visualViewport; 
-            main.style.height = height + "px"; 
-            main.style.top = offsetTop + "px"; 
             
-            // 只有当页面确实被滚动了才尝试重置，且不使用强制 scrollTo(0,0)
+            // 只有显著变化才更新，减少抖动
+            if (Math.abs(lastHeight - height) > 1 || Math.abs(lastOffsetTop - offsetTop) > 1) {
+                main.style.height = height + "px"; 
+                main.style.top = offsetTop + "px"; 
+                lastHeight = height;
+                lastOffsetTop = offsetTop;
+            }
+            
             if (window.scrollY > 0) {
                 window.scrollTo(0, 0);
             }
@@ -1328,7 +1348,7 @@ function updateHeight() {
         } 
 
         if (wasNearBottom) { 
-            scrollBottom(); 
+            scrollBottom(true); // 布局变化时，建议非平滑强制滚动，更不容易抖动
         } 
         updateHeightPending = false; 
     }); 
@@ -1684,13 +1704,17 @@ function addSystem(text) {
  } 
  
  /* 滚动 */ 
-function scrollBottom() { 
+let scrollTimer = null;
+function scrollBottom(force = false) { 
     const chat = document.getElementById("chat"); 
-    requestAnimationFrame(() => { 
+    if (scrollTimer && !force) return;
+    
+    scrollTimer = requestAnimationFrame(() => { 
         chat.scrollTo({ 
             top: chat.scrollHeight, 
-            behavior: "smooth" 
+            behavior: force ? "auto" : "smooth" 
         }); 
+        scrollTimer = null;
     }); 
 } 
  

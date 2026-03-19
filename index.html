@@ -252,12 +252,14 @@
     }
     
     #friendsPage, #privateChatPage {
-        position: absolute;
+        position: fixed;
         inset: 0;
         display: none;
         flex-direction: column;
         background: rgba(255,255,255,0.98);
         z-index: 5000;
+        overflow: hidden;
+        will-change: height, top;
     }
     
     .friendItem {
@@ -1609,6 +1611,7 @@ let unreadPrivateMsgs = {}; // { username: count }
             if (data.type === "friends_list") {
                 myFriends = data.friends || [];
                 renderFriends();
+                renderMembers(); // 更新在线成员列表中的好友标识
                 updateFriendBadge();
                 return;
             }
@@ -2082,6 +2085,14 @@ privateSendBtn.addEventListener("click", () => {
     }
 });
 
+privateMsgInput.addEventListener("focus", () => {
+    setTimeout(updateHeight, 300);
+});
+
+privateMsgInput.addEventListener("blur", () => {
+    setTimeout(updateHeight, 100);
+});
+
 privateMsgInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
@@ -2161,6 +2172,17 @@ function renderMembers() {
                 badge.innerText = badgeText;
                 nameRow.appendChild(badge);
             }
+            
+            // 添加好友标识
+            const friend = myFriends.find(f => f.username === m.username);
+            if (friend && friend.status === "accepted") {
+                const fBadge = document.createElement("div");
+                fBadge.className = "memberBadge";
+                fBadge.style.background = "rgba(139, 92, 246, 0.12)";
+                fBadge.style.color = "rgba(139, 92, 246, 1)";
+                fBadge.innerText = "好友";
+                nameRow.appendChild(fBadge);
+            }
 
             meta.appendChild(nameRow);
 
@@ -2177,8 +2199,27 @@ function renderMembers() {
             item.onclick = () => {
                 const targetUname = (m.username || "").trim();
                 if (targetUname && targetUname !== username) {
-                    if (confirm("确定要向 " + (m.nickname || targetUname) + " 发送好友申请吗？")) {
-                        if (ws) ws.send(JSON.stringify({type: "add_friend", target: targetUname}));
+                    const friend = myFriends.find(f => f.username === targetUname);
+                    if (friend) {
+                        if (friend.status === "accepted") {
+                            // 已是好友，直接打开私聊
+                            closeMembers();
+                            openPrivateChat(targetUname);
+                        } else if (friend.status === "pending") {
+                            if (friend.is_requester) {
+                                alert("已向对方发送过好友申请，等待验证中。");
+                            } else {
+                                // 对方申请过，跳转到好友页面去处理
+                                alert("对方已向你发送过好友申请，请到好友列表处理。");
+                                closeMembers();
+                                friendsPage.style.display = "flex";
+                                if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({type: "get_friends"}));
+                            }
+                        }
+                    } else {
+                        if (confirm("确定要向 " + (m.nickname || targetUname) + " 发送好友申请吗？")) {
+                            if (ws) ws.send(JSON.stringify({type: "add_friend", target: targetUname}));
+                        }
                     }
                 }
             };
@@ -2197,9 +2238,9 @@ function renderMembers() {
 
 function openMembers() {
     membersPage.style.display = "flex";
-    renderMembers();
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({type: "get_users"}));
+        ws.send(JSON.stringify({type: "get_friends"})); // 获取最新好友数据以渲染标识
     }
 }
 
@@ -2238,6 +2279,8 @@ let lastOffsetTop = -1;
 function updateHeight() { 
     const chat = document.getElementById("chat"); 
     const main = document.getElementById("main"); 
+    const friendsPage = document.getElementById("friendsPage");
+    const privateChatPage = document.getElementById("privateChatPage");
     const wasNearBottom = (chat.scrollHeight - chat.scrollTop - chat.clientHeight) < 60; 
 
     if (window.visualViewport) { 
@@ -2245,15 +2288,26 @@ function updateHeight() {
         
         // 当 offsetTop 为 0 时，说明键盘已收起，立即恢复满屏状态，消除空白闪烁
         if (offsetTop <= 0) {
-            main.style.height = "100dvh"; 
+            const fullHeight = "100dvh";
+            main.style.height = fullHeight; 
             main.style.top = "0px";
+            friendsPage.style.height = fullHeight;
+            friendsPage.style.top = "0px";
+            privateChatPage.style.height = fullHeight;
+            privateChatPage.style.top = "0px";
             lastHeight = 0;
             lastOffsetTop = 0;
         } else {
-            // 同步更新 top 和 height，确保 #main 始终精准覆盖可视区域
+            // 同步更新 top 和 height，确保容器始终精准覆盖可视区域
             if (Math.abs(lastHeight - height) > 1 || Math.abs(lastOffsetTop - offsetTop) > 1) {
-                main.style.height = height + "px"; 
-                main.style.top = offsetTop + "px"; 
+                const hStr = height + "px";
+                const tStr = offsetTop + "px";
+                main.style.height = hStr; 
+                main.style.top = tStr; 
+                friendsPage.style.height = hStr;
+                friendsPage.style.top = tStr;
+                privateChatPage.style.height = hStr;
+                privateChatPage.style.top = tStr;
                 lastHeight = height;
                 lastOffsetTop = offsetTop;
             }
@@ -2263,6 +2317,11 @@ function updateHeight() {
             chat.scrollTop = chat.scrollHeight;
         }
         
+        // 如果正在私聊，也要确保底部滚动
+        if (activePrivateChat) {
+            privateChatList.scrollTop = privateChatList.scrollHeight;
+        }
+        
         // 核心：强制 body 回位，使用延时确保在系统行为之后触发
         setTimeout(() => {
             if (window.scrollY !== 0) {
@@ -2270,8 +2329,13 @@ function updateHeight() {
             }
         }, 20);
     } else { 
-        main.style.height = "100dvh"; 
+        const fullHeight = "100dvh";
+        main.style.height = fullHeight; 
         main.style.top = "0px";
+        friendsPage.style.height = fullHeight;
+        friendsPage.style.top = "0px";
+        privateChatPage.style.height = fullHeight;
+        privateChatPage.style.top = "0px";
     } 
 } 
 
@@ -2353,13 +2417,21 @@ function addMessage(data, prepend = false) {
     const name = document.createElement("div"); 
     name.className = "username"; 
     const displayName = data.nickname || data.user;
+    
+    // 如果是好友，添加好友图标标识
+    let friendBadgeHtml = "";
+    const isFriend = myFriends.some(f => f.username === sender && f.status === "accepted");
+    if (isFriend && !isMe) {
+        friendBadgeHtml = `<span style="font-size:10px;background:rgba(139,92,246,0.1);color:rgba(139,92,246,1);padding:1px 4px;border-radius:4px;margin-left:4px;">好友</span>`;
+    }
+
     if (isPm) { 
         const fromName = data.fromNickname || data.from;
-        name.innerText = isMe ? ("你 ➜ " + data.to + " (私聊)") : (fromName + " ➜ 你 (私聊)"); 
+        name.innerHTML = (isMe ? ("你 ➜ " + data.to + " (私聊)") : (fromName + " ➜ 你 (私聊)")) + friendBadgeHtml; 
     } else if (isMeAction) { 
-        name.innerText = displayName; 
+        name.innerHTML = displayName + friendBadgeHtml; 
     } else { 
-        name.innerText = displayName; 
+        name.innerHTML = displayName + friendBadgeHtml; 
     } 
     name.style.color = hashColor(sender || ""); 
     name.style.display = "flex"; 

@@ -1559,18 +1559,28 @@ function syncAuthModeUI() {
         if (!isRecording) {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
+                
+                // 自动选择支持的 MIME 类型
+                let mimeType = 'audio/webm';
+                if (!MediaRecorder.isTypeSupported(mimeType)) {
+                    mimeType = 'audio/mp4'; // iOS Safari 常用
+                }
+                if (!MediaRecorder.isTypeSupported(mimeType)) {
+                    mimeType = ''; // 浏览器默认
+                }
+                
+                mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
                 audioChunks = [];
                 
                 mediaRecorder.ondataavailable = (event) => {
-                    audioChunks.push(event.data);
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
                 };
                 
                 mediaRecorder.onstop = async () => {
-                    // 使用标准的 audio/webm，但在某些浏览器中可能需要更广泛的兼容性
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
                     
-                    // 检查 Blob 是否有效
                     if (audioBlob.size === 0) {
                         console.error("录音文件为空");
                         return;
@@ -1578,9 +1588,14 @@ function syncAuthModeUI() {
 
                     const reader = new FileReader();
                     reader.onloadend = () => {
-                        const base64Audio = reader.result;
+                        let base64Audio = reader.result;
                         
-                        // 额外校验：如果是 iOS 微信或某些特殊环境，可能需要处理 data 协议头
+                        // 统一 Base64 格式，确保包含正确的 MIME 类型
+                        if (base64Audio && !base64Audio.startsWith("data:")) {
+                            const actualMime = mediaRecorder.mimeType || "audio/webm";
+                            base64Audio = `data:${actualMime};base64,${base64Audio}`;
+                        }
+                        
                         if (ws && ws.readyState === WebSocket.OPEN) {
                             if (targetUser) {
                                 ws.send(JSON.stringify({
@@ -3250,25 +3265,39 @@ function addMessage(data, prepend = false) {
         voiceBtn.style.gap = "8px";
         voiceBtn.innerHTML = `<span>🎤</span> <span>[语音消息 - 点击播放]</span>`;
         voiceBtn.onclick = () => {
-            const audio = new Audio();
             const voiceData = data.type === "voice" ? data.voice : data.text;
-            
-            // 兼容性修复：确保 base64 协议头正确
-            // 如果是录制的 webm 数据，确保带有正确的 MIME 类型
-            if (voiceData && !voiceData.startsWith("data:")) {
-                audio.src = "data:audio/webm;base64," + voiceData;
-            } else {
-                audio.src = voiceData;
+            if (!voiceData) return;
+
+            // 检查协议头并确定正确的音频类型
+            let audioSrc = voiceData;
+            if (!voiceData.startsWith("data:")) {
+                audioSrc = "data:audio/webm;base64," + voiceData;
             }
+
+            const audio = new Audio();
             
-            audio.play().catch(err => {
-                console.error("播放失败:", err);
-                if (err.name === "NotAllowedError") {
-                    alert("请在浏览器设置中允许网页播放声音。");
-                } else {
-                    alert("语音文件格式可能不兼容当前浏览器。");
-                }
-            });
+            // 解决移动端解码和播放兼容性
+            audio.preload = "auto";
+            audio.src = audioSrc;
+            
+            // 关键：在 iOS 上必须显式加载
+            audio.load();
+            
+            const playPromise = audio.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(err => {
+                    console.error("播放失败详情:", err);
+                    if (err.name === "NotAllowedError") {
+                        alert("请点击屏幕任意位置后再试，或检查浏览器权限。");
+                    } else if (err.name === "NotSupportedError") {
+                        // 如果 webm 不支持，尝试强制转换为 mp4 容器头（仅针对 iOS）
+                        if (audioSrc.includes("audio/webm")) {
+                            audio.src = audioSrc.replace("audio/webm", "audio/mp4");
+                            audio.play().catch(e => alert("您的浏览器不支持此音频格式"));
+                        }
+                    }
+                });
+            }
         };
         bubble.appendChild(voiceBtn);
     } else { 

@@ -713,6 +713,19 @@
             } 
         }); 
     } 
+
+    if (isAdmin && sender && sender !== username) {
+        addBtn("设为管理员", () => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({type: "command", cmd: "setadmin", user: sender}));
+            }
+        });
+        addBtn("取消管理员", () => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({type: "command", cmd: "unsetadmin", user: sender}));
+            }
+        }, true);
+    }
  
      if (sender && sender !== username) { 
          if (blocked.has(sender)) { 

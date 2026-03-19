@@ -56,13 +56,13 @@
         top: 0;
         left: 0; 
         right: 0; 
-        bottom: 0;
         display: flex; 
         flex-direction: column; 
         width: 100%; 
         max-width: 980px; 
         margin: 0 auto; 
         background: transparent; 
+        height: 100dvh; 
         overflow: hidden; 
         will-change: height, top; 
     } 
@@ -1716,10 +1716,11 @@ imageInput.addEventListener("change", (e) => {
     // 移除导致抖动的强制滚动
     updateHeight(); 
 }); 
-msgInput.addEventListener("focus", () => { 
+msgInput.addEventListener("focus", (e) => { 
     setTimeout(() => {
         updateHeight();
         chat.scrollTop = chat.scrollHeight;
+        e.target.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }, 300);
 }); 
  
@@ -2272,10 +2273,11 @@ privateSendBtn.addEventListener("click", () => {
     }
 });
 
-privateMsgInput.addEventListener("focus", () => {
+privateMsgInput.addEventListener("focus", (e) => {
     setTimeout(() => {
         updateHeight();
         privateChatList.scrollTop = privateChatList.scrollHeight;
+        e.target.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }, 300);
 });
 
@@ -2469,53 +2471,64 @@ let lastOffsetTop = -1;
 function updateHeight() { 
     if (!window.visualViewport) return;
 
-    const chat = document.getElementById("chat"); 
-    const main = document.getElementById("main"); 
-    const friendsPage = document.getElementById("friendsPage");
-    const privateChatPage = document.getElementById("privateChatPage");
-    const membersPage = document.getElementById("membersPage");
-    const inputArea = document.getElementById("inputArea");
-    const privateInputArea = document.getElementById("privateInputArea");
-    
-    const { height, offsetTop } = window.visualViewport;
-    const viewportHeight = window.innerHeight;
-    const keyboardActive = offsetTop > 0 || height < (viewportHeight - 20);
-    
-    const wasNearBottom = (chat.scrollHeight - chat.scrollTop - chat.clientHeight) < 60; 
+    // 使用 requestAnimationFrame 确保布局更新与浏览器渲染帧同步，消除抖动
+    requestAnimationFrame(() => {
+        const chat = document.getElementById("chat"); 
+        const main = document.getElementById("main"); 
+        const friendsPage = document.getElementById("friendsPage");
+        const privateChatPage = document.getElementById("privateChatPage");
+        const membersPage = document.getElementById("membersPage");
+        const inputArea = document.getElementById("inputArea");
+        const privateInputArea = document.getElementById("privateInputArea");
+        
+        const { height, offsetTop } = window.visualViewport;
+        const viewportHeight = window.innerHeight;
+        
+        // 键盘活跃判断：基于视口偏移或高度显著缩小
+        const keyboardActive = offsetTop > 10 || height < (viewportHeight - 40);
+        
+        const wasNearBottom = (chat.scrollHeight - chat.scrollTop - chat.clientHeight) < 60; 
 
-    // 设置容器位置
-    const targets = [main, friendsPage, privateChatPage, membersPage];
-    targets.forEach(el => {
-        if (el) {
-            if (keyboardActive) {
-                el.style.top = offsetTop + "px";
-                el.style.height = height + "px";
-            } else {
-                // 键盘完全收回，瞬间重置样式
-                el.style.top = "";
-                el.style.height = "";
+        // 统一设置容器位置和高度，使用 fixed 定位下的 top/height 配合是目前移动端最稳健的方案
+        const targets = [main, friendsPage, privateChatPage, membersPage];
+        targets.forEach(el => {
+            if (el) {
+                if (keyboardActive) {
+                    el.style.top = offsetTop + "px";
+                    el.style.height = height + "px";
+                } else {
+                    // 键盘关闭时，重置为 100dvh 并清空 top 偏移，恢复默认布局
+                    el.style.top = "0px";
+                    el.style.height = "100dvh";
+                }
             }
+        });
+
+        // 键盘活跃时，移除底部安全区边距，防止输入框位置过高
+        if (keyboardActive) {
+            if (inputArea) inputArea.style.paddingBottom = "0px";
+            if (privateInputArea) privateInputArea.style.paddingBottom = "0px";
+        } else {
+            // 键盘收起时，恢复安全区内边距以适配全面屏
+            if (inputArea) inputArea.style.paddingBottom = "env(safe-area-inset-bottom)";
+            if (privateInputArea) privateInputArea.style.paddingBottom = "0px";
         }
+
+        // 滚动状态同步
+        if (wasNearBottom) {
+            chat.scrollTop = chat.scrollHeight;
+        }
+        if (activePrivateChat && privateChatList) {
+            privateChatList.scrollTop = privateChatList.scrollHeight;
+        }
+
+        // 核心：强制 body 复位。使用 setTimeout 确保在系统默认滚动行为之后触发
+        setTimeout(() => {
+            if (window.scrollY !== 0) {
+                window.scrollTo(0, 0);
+            }
+        }, 30);
     });
-
-    // 适配安全区
-    if (keyboardActive) {
-        if (inputArea) inputArea.style.paddingBottom = "0px";
-        if (privateInputArea) privateInputArea.style.paddingBottom = "0px";
-    } else {
-        if (inputArea) inputArea.style.paddingBottom = "env(safe-area-inset-bottom)";
-    }
-
-    // 滚动对齐
-    if (wasNearBottom) {
-        chat.scrollTop = chat.scrollHeight;
-    }
-    if (activePrivateChat && privateChatList) {
-        privateChatList.scrollTop = privateChatList.scrollHeight;
-    }
-
-    // 极速回位
-    if (window.scrollY !== 0) window.scrollTo(0, 0);
 } 
 
 if (window.visualViewport) { 

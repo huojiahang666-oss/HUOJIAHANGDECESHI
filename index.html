@@ -225,9 +225,118 @@
  }
  
  .memberBadgeDanger {
-     background: rgba(239, 68, 68, 0.12);
-     color: rgba(239, 68, 68, 1);
- }
+        background: rgba(239, 68, 68, 0.12);
+        color: rgba(239, 68, 68, 1);
+    }
+    
+    .offline {
+        filter: grayscale(100%);
+        opacity: 0.6;
+    }
+    
+    .badge-container {
+        position: relative;
+        display: inline-block;
+    }
+    
+    .badge-dot {
+        position: absolute;
+        top: -2px;
+        right: -2px;
+        width: 10px;
+        height: 10px;
+        background: #ef4444;
+        border: 2px solid white;
+        border-radius: 50%;
+        display: none;
+    }
+    
+    #friendsPage, #privateChatPage {
+        position: absolute;
+        inset: 0;
+        display: none;
+        flex-direction: column;
+        background: rgba(255,255,255,0.98);
+        z-index: 5000;
+    }
+    
+    .friendItem {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.05);
+        cursor: pointer;
+    }
+    
+    .friendItem:active {
+        background: rgba(15, 23, 42, 0.04);
+    }
+    
+    .friendAvatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+        object-fit: cover;
+        background: rgba(15, 23, 42, 0.06);
+    }
+    
+    .friendInfo {
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .friendName {
+        font-weight: 600;
+        font-size: 15px;
+        color: var(--text);
+    }
+    
+    .friendStatus {
+        font-size: 12px;
+        color: var(--muted);
+    }
+    
+    .requestActions {
+        display: flex;
+        gap: 8px;
+    }
+    
+    .actionBtn {
+        padding: 4px 12px;
+        border-radius: 8px;
+        font-size: 12px;
+        border: none;
+        cursor: pointer;
+    }
+    
+    .acceptBtn { background: var(--accent-2); color: white; }
+    .rejectBtn { background: #ef4444; color: white; }
+    
+    #privateChatHeader {
+        height: 50px;
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+        background: rgba(15, 23, 42, 0.78);
+        color: white;
+        backdrop-filter: blur(12px);
+    }
+    
+    #privateChatList {
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px;
+        background: #f8fafc;
+    }
+    
+    #privateInputArea {
+        padding: 10px;
+        display: flex;
+        gap: 8px;
+        background: white;
+        border-top: 1px solid var(--border);
+    }
  
  #searchInput { 
      height: 26px; 
@@ -567,6 +676,10 @@
          </div> 
          <div id="topRight"> 
             <input id="searchInput" placeholder="搜索" style="display:none;"> 
+            <div class="badge-container">
+                <button class="topBtn" id="friendsBtn">好友</button>
+                <div class="badge-dot" id="friendBadge"></div>
+            </div>
             <button class="topBtn" id="membersBtn">成员</button>
             <button class="topBtn" id="searchToggle">搜索</button> 
             <button class="topBtn" id="showHelp">说明</button> 
@@ -584,6 +697,29 @@
              <div></div>
          </div>
          <div id="membersList"></div>
+     </div>
+
+     <div id="friendsPage">
+         <div id="membersHeader">
+             <div id="membersHeaderLeft">
+                 <button class="topBtn" id="friendsBack">返回</button>
+                 <div id="friendsTitle">我的好友</div>
+             </div>
+             <button class="topBtn" id="addFriendBtn">添加好友</button>
+         </div>
+         <div id="friendsList" style="flex:1;overflow-y:auto;"></div>
+     </div>
+
+     <div id="privateChatPage">
+         <div id="privateChatHeader">
+             <button class="topBtn" id="privateBack">返回</button>
+             <div id="privateTitle" style="margin-left:12px;font-weight:600;">私聊</div>
+         </div>
+         <div id="privateChatList"></div>
+         <div id="privateInputArea">
+             <input id="privateMsgInput" placeholder="输入私信..." style="flex:1;padding:10px;border:1px solid #ddd;border-radius:12px;outline:none;">
+             <button id="privateSendBtn" style="width:70px;">发送</button>
+         </div>
      </div>
       <div id="chat"> 
          <div id="loadMore" class="loadMore"> 
@@ -1309,10 +1445,13 @@ msgInput.addEventListener("focus", () => {
 }); 
  
  let ws; 
- let shouldReconnect = true; 
- let forcedLogout = false;
+let shouldReconnect = true; 
+let forcedLogout = false;
 let latestMembers = [];
 let latestMembersRoom = "";
+let myFriends = [];
+let activePrivateChat = null;
+let unreadRequests = 0;
  function forceLogout(text) {
      forcedLogout = true;
      shouldReconnect = false;
@@ -1376,6 +1515,57 @@ let latestMembersRoom = "";
      ws.onmessage = (e) => { 
             const data = JSON.parse(e.data); 
 
+            if (data.type === "friends_list") {
+                myFriends = data.friends || [];
+                renderFriends();
+                updateFriendBadge();
+                return;
+            }
+
+            if (data.type === "friend_request_received") {
+                addSystem("收到来自 " + data.from + " 的好友申请");
+                unreadRequests++;
+                updateFriendBadge();
+                if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({type: "get_friends"}));
+                return;
+            }
+
+            if (data.type === "friend_request_accepted") {
+                addSystem(data.user + " 接受了你的好友申请");
+                if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({type: "get_friends"}));
+                return;
+            }
+
+            if (data.type === "friend_status") {
+                const friend = myFriends.find(f => f.username === data.user);
+                if (friend) {
+                    friend.online = data.online;
+                    renderFriends();
+                }
+                return;
+            }
+
+            if (data.type === "private_chat_msg") {
+                const isFromMe = data.from === username;
+                const otherUser = isFromMe ? data.to : data.from;
+                
+                if (activePrivateChat === otherUser) {
+                    addPrivateMessage(data);
+                } else if (!isFromMe) {
+                    addSystem("收到来自 " + data.from + " 的私信: " + data.text);
+                }
+                return;
+            }
+
+            if (data.type === "private_history") {
+                if (activePrivateChat === data.target) {
+                    const list = document.getElementById("privateChatList");
+                    list.innerHTML = "";
+                    (data.messages || []).forEach(m => addPrivateMessage(m));
+                }
+                return;
+            }
+
             if (data.type === "auth_success") {
                 if (data.text === "注册成功，请登录") {
                     alert(data.text);
@@ -1401,6 +1591,7 @@ let latestMembersRoom = "";
                     }
                     authModal.style.display = "none";
                     ws.send(JSON.stringify({user: username, room: displayRoom, roomKey: roomKey || undefined}));
+                    ws.send(JSON.stringify({type: "get_friends"})); // 登录后获取好友列表以更新红点
                 }
                 return;
             }
@@ -1573,6 +1764,141 @@ const membersPage = document.getElementById("membersPage");
 const membersBack = document.getElementById("membersBack");
 const membersTitle = document.getElementById("membersTitle");
 const membersList = document.getElementById("membersList");
+
+// 好友功能
+const friendsBtn = document.getElementById("friendsBtn");
+const friendsPage = document.getElementById("friendsPage");
+const friendsBack = document.getElementById("friendsBack");
+const friendsList = document.getElementById("friendsList");
+const addFriendBtn = document.getElementById("addFriendBtn");
+const friendBadge = document.getElementById("friendBadge");
+
+const privateChatPage = document.getElementById("privateChatPage");
+const privateBack = document.getElementById("privateBack");
+const privateTitle = document.getElementById("privateTitle");
+const privateChatList = document.getElementById("privateChatList");
+const privateMsgInput = document.getElementById("privateMsgInput");
+const privateSendBtn = document.getElementById("privateSendBtn");
+
+function updateFriendBadge() {
+    const pending = myFriends.filter(f => f.status === "pending" && !f.is_requester).length;
+    if (pending > 0) {
+        friendBadge.style.display = "block";
+    } else {
+        friendBadge.style.display = "none";
+    }
+}
+
+function renderFriends() {
+    friendsList.innerHTML = "";
+    myFriends.forEach(f => {
+        const item = document.createElement("div");
+        item.className = "friendItem";
+        
+        const avatar = document.createElement("img");
+        avatar.className = "friendAvatar" + (f.online ? "" : " offline");
+        avatar.src = f.avatar || "https://api.dicebear.com/7.x/identicon/svg?seed=" + f.username;
+        
+        const info = document.createElement("div");
+        info.className = "friendInfo";
+        info.innerHTML = `<div class="friendName">${f.nickname} (${f.username})</div>
+                          <div class="friendStatus">${f.online ? "在线" : "离线"}</div>`;
+        
+        item.appendChild(avatar);
+        item.appendChild(info);
+        
+        if (f.status === "pending") {
+            if (!f.is_requester) {
+                const actions = document.createElement("div");
+                actions.className = "requestActions";
+                const accept = document.createElement("button");
+                accept.className = "actionBtn acceptBtn";
+                accept.innerText = "接受";
+                accept.onclick = (e) => {
+                    e.stopPropagation();
+                    if (ws) ws.send(JSON.stringify({type: "respond_friend", target: f.username, action: "accept"}));
+                };
+                const reject = document.createElement("button");
+                reject.className = "actionBtn rejectBtn";
+                reject.innerText = "拒绝";
+                reject.onclick = (e) => {
+                    e.stopPropagation();
+                    if (ws) ws.send(JSON.stringify({type: "respond_friend", target: f.username, action: "reject"}));
+                };
+                actions.appendChild(accept);
+                actions.appendChild(reject);
+                item.appendChild(actions);
+            } else {
+                const status = document.createElement("div");
+                status.innerText = "等待验证";
+                status.style.fontSize = "12px";
+                item.appendChild(status);
+            }
+        } else {
+            item.onclick = () => openPrivateChat(f.username);
+        }
+        
+        friendsList.appendChild(item);
+    });
+}
+
+function openPrivateChat(target) {
+    activePrivateChat = target;
+    privateTitle.innerText = "与 " + target + " 的私聊";
+    privateChatPage.style.display = "flex";
+    privateChatList.innerHTML = "";
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({type: "get_private_history", target: target}));
+    }
+}
+
+function addPrivateMessage(data) {
+    const isMe = data.from === username;
+    const msg = document.createElement("div");
+    msg.className = "message " + (isMe ? "right" : "left");
+    
+    msg.innerHTML = `<img class="avatar" src="https://api.dicebear.com/7.x/identicon/svg?seed=${data.from}">
+                     <div class="msg_content">
+                        <div class="bubble">${data.text}</div>
+                        <div class="time">${data.time}</div>
+                     </div>`;
+    privateChatList.appendChild(msg);
+    privateChatList.scrollTop = privateChatList.scrollHeight;
+}
+
+friendsBtn.addEventListener("click", () => {
+    friendsPage.style.display = "flex";
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({type: "get_friends"}));
+});
+
+friendsBack.addEventListener("click", () => friendsPage.style.display = "none");
+
+addFriendBtn.addEventListener("click", () => {
+    const target = prompt("输入对方用户名:");
+    if (target && target !== username) {
+        if (ws) ws.send(JSON.stringify({type: "add_friend", target: target}));
+    }
+});
+
+privateBack.addEventListener("click", () => {
+    privateChatPage.style.display = "none";
+    activePrivateChat = null;
+});
+
+privateSendBtn.addEventListener("click", () => {
+    const text = privateMsgInput.value.trim();
+    if (text && activePrivateChat) {
+        ws.send(JSON.stringify({type: "send_private_msg", to: activePrivateChat, text: text}));
+        privateMsgInput.value = "";
+    }
+});
+
+privateMsgInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        privateSendBtn.click();
+    }
+});
 
 function normalizeAvatar(member) {
     if (member && member.avatar) return member.avatar;

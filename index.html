@@ -1094,7 +1094,16 @@
  const regCodeField = document.getElementById("reg_code_field");
  const sendCodeBtn = document.getElementById("send_code_btn");
 
- function syncAuthModeUI() {
+ // 为登录注册输入框添加防遮挡处理
+[authUser, authPass, authEmail, authCode].forEach(input => {
+    input.addEventListener('focus', (e) => {
+        setTimeout(() => {
+            e.target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }, 300);
+    });
+});
+
+function syncAuthModeUI() {
      authTitle.innerText = isRegistering ? "注册账号" : "欢迎回来";
      authBtn.innerText = isRegistering ? "立即注册" : "进入聊天室";
      authSwitchText.innerText = isRegistering ? "已有账号？" : "没有账号？";
@@ -1706,9 +1715,12 @@ imageInput.addEventListener("change", (e) => {
     // 移除导致抖动的强制滚动
     updateHeight(); 
 }); 
-msgInput.addEventListener("focus", () => { 
+msgInput.addEventListener("focus", (e) => { 
     // 强制立即更新布局
-    updateHeight(); 
+    setTimeout(() => {
+        updateHeight();
+        e.target.scrollIntoView({ block: 'center' });
+    }, 300);
 }); 
  
  let ws; 
@@ -2260,8 +2272,11 @@ privateSendBtn.addEventListener("click", () => {
     }
 });
 
-privateMsgInput.addEventListener("focus", () => {
-    setTimeout(updateHeight, 300);
+privateMsgInput.addEventListener("focus", (e) => {
+    setTimeout(() => {
+        updateHeight();
+        e.target.scrollIntoView({ block: 'center' });
+    }, 300);
 });
 
 privateMsgInput.addEventListener("blur", () => {
@@ -2456,6 +2471,8 @@ function updateHeight() {
     const main = document.getElementById("main"); 
     const friendsPage = document.getElementById("friendsPage");
     const privateChatPage = document.getElementById("privateChatPage");
+    const inputArea = document.getElementById("inputArea");
+    const privateInputArea = document.getElementById("privateInputArea");
     const wasNearBottom = (chat.scrollHeight - chat.scrollTop - chat.clientHeight) < 60; 
 
     if (window.visualViewport) { 
@@ -2470,6 +2487,8 @@ function updateHeight() {
             friendsPage.style.top = "0px";
             privateChatPage.style.height = fullHeight;
             privateChatPage.style.top = "0px";
+            if (inputArea) inputArea.style.paddingBottom = "env(safe-area-inset-bottom)";
+            if (privateInputArea) privateInputArea.style.paddingBottom = "0px"; // 私聊默认无额外边距
             lastHeight = 0;
             lastOffsetTop = 0;
         } else {
@@ -2483,6 +2502,9 @@ function updateHeight() {
                 friendsPage.style.top = tStr;
                 privateChatPage.style.height = hStr;
                 privateChatPage.style.top = tStr;
+                // 键盘弹出时移除安全区内边距，避免输入框被推得太高
+                if (inputArea) inputArea.style.paddingBottom = "0px";
+                if (privateInputArea) privateInputArea.style.paddingBottom = "0px";
                 lastHeight = height;
                 lastOffsetTop = offsetTop;
             }
@@ -2493,7 +2515,7 @@ function updateHeight() {
         }
         
         // 如果正在私聊，也要确保底部滚动
-        if (activePrivateChat) {
+        if (activePrivateChat && privateChatList) {
             privateChatList.scrollTop = privateChatList.scrollHeight;
         }
         
@@ -2519,6 +2541,7 @@ if (window.visualViewport) {
     window.visualViewport.addEventListener("scroll", updateHeight); 
 } 
 window.addEventListener("resize", updateHeight); 
+window.addEventListener("orientationchange", () => setTimeout(updateHeight, 500));
  if (!window.visualViewport) { 
      document.addEventListener("focusin", () => setTimeout(updateHeight, 300)); 
  } 

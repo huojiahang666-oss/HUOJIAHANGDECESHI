@@ -424,6 +424,26 @@ body {
         color: #94a3b8;
     }
 
+    #privateImageBtn {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: #f1f5f9;
+        color: #475569;
+        border: 1px solid rgba(15, 23, 42, 0.06);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: transform 0.2s, background 0.2s;
+        flex-shrink: 0;
+    }
+
+    #privateImageBtn:active {
+        transform: scale(0.92);
+        background: #e2e8f0;
+    }
+
     #privateSendBtn {
         width: 44px;
         height: 44px;
@@ -499,6 +519,18 @@ body {
         background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
         color: #ffffff;
         border-radius: 18px 18px 4px 18px;
+    }
+
+    .pm-bubble.image {
+        padding: 6px;
+    }
+
+    .pm-bubble.image img {
+        display: block;
+        max-width: min(55vw, 260px);
+        max-height: 320px;
+        border-radius: 14px;
+        object-fit: cover;
     }
 
     .pm-time {
@@ -1156,6 +1188,10 @@ body {
          </div>
          <div id="privateChatList"></div>
          <div id="privateInputArea">
+            <input type="file" id="privateImageInput" accept="image/*" style="display:none;">
+            <button id="privateImageBtn" type="button" aria-label="发送图片">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L5 21"></path></svg>
+            </button>
              <input id="privateMsgInput" placeholder="发消息..." autocomplete="off">
              <button id="privateSendBtn">
                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
@@ -2026,7 +2062,7 @@ let unreadPrivateMsgs = {}; // { username: count }
                     updateFriendBadge(); // 更新顶部好友按钮的红点
                     
                     // 显示 Toast 弹窗
-                    showToast(data.from, data.text);
+                    showToast(data.from, data.msg_type === "image" ? "[图片]" : data.text);
                 }
                 return;
             }
@@ -2253,6 +2289,8 @@ const privateTitle = document.getElementById("privateTitle");
 const privateStatusDot = document.getElementById("privateStatusDot");
 const privateStatusText = document.getElementById("privateStatusText");
 const privateChatList = document.getElementById("privateChatList");
+const privateImageInput = document.getElementById("privateImageInput");
+const privateImageBtn = document.getElementById("privateImageBtn");
 const privateMsgInput = document.getElementById("privateMsgInput");
 const privateSendBtn = document.getElementById("privateSendBtn");
 
@@ -2418,12 +2456,53 @@ function addPrivateMessage(data) {
     msg.className = "pm-message " + (isMe ? "right" : "left");
     
     const avatarUrl = data.avatar || "https://api.dicebear.com/7.x/identicon/svg?seed=" + (data.from || "anon");
-    
-    msg.innerHTML = `<img class="pm-avatar" src="${avatarUrl}">
-                     <div class="pm-content-wrapper">
-                        <div class="pm-bubble">${data.text}</div>
-                        <div class="pm-time">${data.time}</div>
-                     </div>`;
+
+    const avatar = document.createElement("img");
+    avatar.className = "pm-avatar";
+    avatar.src = avatarUrl;
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "pm-content-wrapper";
+
+    const bubble = document.createElement("div");
+    const isImage = data.msg_type === "image" || (typeof data.text === "string" && data.text.startsWith("data:image/"));
+    bubble.className = "pm-bubble" + (isImage ? " image" : "");
+
+    if (isImage) {
+        const img = document.createElement("img");
+        img.src = data.text;
+        img.onclick = () => {
+            const overlay = document.createElement("div");
+            overlay.style.position = "fixed";
+            overlay.style.inset = "0";
+            overlay.style.background = "rgba(0,0,0,0.9)";
+            overlay.style.display = "flex";
+            overlay.style.alignItems = "center";
+            overlay.style.justifyContent = "center";
+            overlay.style.zIndex = "10000";
+            overlay.onclick = () => document.body.removeChild(overlay);
+            const fullImg = document.createElement("img");
+            fullImg.src = data.text;
+            fullImg.style.maxWidth = "95vw";
+            fullImg.style.maxHeight = "95vh";
+            fullImg.style.objectFit = "contain";
+            overlay.appendChild(fullImg);
+            document.body.appendChild(overlay);
+        };
+        bubble.appendChild(img);
+    } else {
+        bubble.innerText = data.text || "";
+    }
+
+    const time = document.createElement("div");
+    time.className = "pm-time";
+    time.innerText = data.time || "";
+
+    wrapper.appendChild(bubble);
+    wrapper.appendChild(time);
+
+    msg.appendChild(avatar);
+    msg.appendChild(wrapper);
     privateChatList.appendChild(msg);
     privateChatList.scrollTop = privateChatList.scrollHeight;
 }
@@ -2445,6 +2524,71 @@ addFriendBtn.addEventListener("click", () => {
 privateBack.addEventListener("click", () => {
     privateChatPage.style.display = "none";
     activePrivateChat = null;
+});
+
+privateImageBtn.addEventListener("click", () => {
+    if (privateImageInput) privateImageInput.click();
+});
+
+privateImageInput.addEventListener("change", (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    if (!activePrivateChat) {
+        privateImageInput.value = "";
+        return;
+    }
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        addSystem("未连接，稍后再试");
+        privateImageInput.value = "";
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement("canvas");
+            let width = img.width;
+            let height = img.height;
+            const MAX_WIDTH = 1200;
+            const MAX_HEIGHT = 1200;
+
+            if (width > height) {
+                if (width > MAX_WIDTH) {
+                    height *= MAX_WIDTH / width;
+                    width = MAX_WIDTH;
+                }
+            } else {
+                if (height > MAX_HEIGHT) {
+                    width *= MAX_HEIGHT / height;
+                    height = MAX_HEIGHT;
+                }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
+
+            try {
+                ws.send(JSON.stringify({
+                    type: "send_private_msg",
+                    to: activePrivateChat,
+                    text: compressedBase64,
+                    msg_type: "image"
+                }));
+            } catch (err) {
+                addSystem("图片发送失败: " + err.message);
+            }
+        };
+        img.src = ev.target.result;
+    };
+    reader.onerror = () => {
+        addSystem("读取图片失败");
+    };
+    reader.readAsDataURL(file);
+    privateImageInput.value = "";
 });
 
 privateSendBtn.addEventListener("click", () => {

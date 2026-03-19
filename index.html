@@ -31,6 +31,10 @@
      display: flex; 
      height: 100vh; 
      height: 100dvh; 
+     width: 100vw;
+     position: fixed; /* 锁定 body 及其子元素，防止页面滚动 */
+     overflow: hidden;
+     overscroll-behavior: none;
      background: radial-gradient(1200px 600px at 20% 0%, rgba(59, 130, 246, 0.25), transparent 55%), radial-gradient(900px 500px at 90% 10%, rgba(139, 92, 246, 0.18), transparent 55%), var(--bg); 
      color: var(--text); 
      -webkit-font-smoothing: antialiased; 
@@ -487,14 +491,14 @@
          <div id="auth_fields">
              <div style="margin-bottom:12px;">
                  <label style="display:block;margin-bottom:5px;font-size:14px;">用户名</label>
-                 <input id="auth_user" placeholder="3-30位字符" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;">
+                 <input id="auth_user" placeholder="3-30位字符" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;font-size:16px;">
              </div>
              
              <!-- 注册时显示的邮箱字段 -->
              <div id="reg_email_field" style="display:none;margin-bottom:12px;">
                  <label style="display:block;margin-bottom:5px;font-size:14px;">电子邮箱</label>
                  <div style="display:flex;gap:8px;">
-                     <input id="auth_email" placeholder="用于接收验证码" style="flex:1;padding:10px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;">
+                     <input id="auth_email" placeholder="用于接收验证码" style="flex:1;padding:10px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;font-size:16px;">
                      <button id="send_code_btn" style="width:100px;font-size:12px;background:#f2f2f2;color:#333;border:1px solid #ddd;">发送验证码</button>
                  </div>
              </div>
@@ -502,12 +506,12 @@
              <!-- 注册时显示的验证码字段 -->
              <div id="reg_code_field" style="display:none;margin-bottom:12px;">
                  <label style="display:block;margin-bottom:5px;font-size:14px;">验证码</label>
-                 <input id="auth_code" placeholder="6位数字" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;">
+                 <input id="auth_code" placeholder="6位数字" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;font-size:16px;">
              </div>
 
              <div style="margin-bottom:20px;">
                  <label style="display:block;margin-bottom:5px;font-size:14px;">密码</label>
-                 <input id="auth_pass" type="password" placeholder="请输入密码" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;">
+                 <input id="auth_pass" type="password" placeholder="请输入密码" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;font-size:16px;">
              </div>
          </div>
 
@@ -1339,16 +1343,12 @@ function updateHeight() {
                 lastHeight = height;
                 lastOffsetTop = offsetTop;
             }
-            
-            if (window.scrollY > 0) {
-                window.scrollTo(0, 0);
-            }
         } else { 
             main.style.height = window.innerHeight + "px"; 
         } 
 
         if (wasNearBottom) { 
-            scrollBottom(true); // 布局变化时，建议非平滑强制滚动，更不容易抖动
+            scrollBottom(true); 
         } 
         updateHeightPending = false; 
     }); 
@@ -1703,6 +1703,24 @@ function addSystem(text) {
      clearReply(); 
  } 
  
+ // 彻底禁用多指缩放和手势缩放
+ document.addEventListener('gesturestart', function(e) {
+     e.preventDefault();
+ });
+ document.addEventListener('touchstart', function(event) {
+     if (event.touches.length > 1) {
+         event.preventDefault();
+     }
+ }, { passive: false });
+ let lastTouchEnd = 0;
+ document.addEventListener('touchend', function(event) {
+     const now = (new Date()).getTime();
+     if (now - lastTouchEnd <= 300) {
+         event.preventDefault();
+     }
+     lastTouchEnd = now;
+ }, false);
+
  /* 滚动 */ 
 let scrollTimer = null;
 function scrollBottom(force = false) { 

@@ -427,6 +427,181 @@
         padding: 0 4px;
         box-sizing: border-box;
     }
+
+    /* 高级登录注册模态框样式 */
+    #authModal {
+        position: fixed;
+        inset: 0;
+        background: radial-gradient(circle at center, rgba(15, 23, 42, 0.8) 0%, rgba(2, 6, 23, 0.95) 100%);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        animation: fadeIn 0.4s ease;
+    }
+
+    .auth-container {
+        background: rgba(255, 255, 255, 0.95);
+        padding: 40px 32px;
+        border-radius: 24px;
+        width: 320px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+        position: relative;
+        overflow: hidden;
+        animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* 装饰性背景光晕 */
+    .auth-container::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle at top right, rgba(59, 130, 246, 0.15), transparent 40%),
+                    radial-gradient(circle at bottom left, rgba(139, 92, 246, 0.15), transparent 40%);
+        pointer-events: none;
+        z-index: 0;
+    }
+
+    .auth-content {
+        position: relative;
+        z-index: 1;
+    }
+
+    #authTitle {
+        margin-top: 0;
+        margin-bottom: 30px;
+        text-align: center;
+        font-size: 24px;
+        font-weight: 700;
+        color: #0f172a;
+        letter-spacing: -0.5px;
+    }
+
+    .auth-field {
+        margin-bottom: 20px;
+        position: relative;
+    }
+
+    .auth-field label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #475569;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .auth-input {
+        width: 100%;
+        padding: 14px 16px;
+        background: #f8fafc;
+        border: 2px solid transparent;
+        border-radius: 12px;
+        box-sizing: border-box;
+        font-size: 15px;
+        color: #0f172a;
+        transition: all 0.3s ease;
+        outline: none;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02) inset;
+    }
+
+    .auth-input:focus {
+        background: #ffffff;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+    }
+
+    .auth-input::placeholder {
+        color: #94a3b8;
+    }
+
+    .auth-code-group {
+        display: flex;
+        gap: 12px;
+    }
+
+    .auth-code-btn {
+        width: 110px;
+        padding: 0;
+        font-size: 13px;
+        background: #f1f5f9;
+        color: #334155;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .auth-code-btn:hover:not(:disabled) {
+        background: #e2e8f0;
+        color: #0f172a;
+    }
+
+    .auth-code-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .auth-submit-btn {
+        width: 100%;
+        padding: 14px;
+        margin-top: 10px;
+        margin-bottom: 20px;
+        border: none;
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        color: white;
+        border-radius: 12px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .auth-submit-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+    }
+
+    .auth-submit-btn:active {
+        transform: translateY(1px);
+        box-shadow: 0 2px 10px rgba(37, 99, 235, 0.3);
+    }
+
+    .auth-switch {
+        text-align: center;
+        font-size: 14px;
+        color: #64748b;
+    }
+
+    .auth-switch a {
+        color: #3b82f6;
+        text-decoration: none;
+        font-weight: 600;
+        margin-left: 6px;
+        transition: color 0.2s;
+    }
+
+    .auth-switch a:hover {
+        color: #1d4ed8;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    @keyframes slideUp {
+        from { opacity: 0; transform: translateY(20px) scale(0.95); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+    }
  
  #searchInput { 
      height: 26px; 
@@ -920,8 +1095,8 @@
  const sendCodeBtn = document.getElementById("send_code_btn");
 
  function syncAuthModeUI() {
-     authTitle.innerText = isRegistering ? "注册账号" : "登录聊天室";
-     authBtn.innerText = isRegistering ? "立即注册" : "登录";
+     authTitle.innerText = isRegistering ? "注册账号" : "欢迎回来";
+     authBtn.innerText = isRegistering ? "立即注册" : "进入聊天室";
      authSwitchText.innerText = isRegistering ? "已有账号？" : "没有账号？";
      authSwitchBtn.innerText = isRegistering ? "立即登录" : "立即注册";
      regEmailField.style.display = isRegistering ? "block" : "none";
@@ -1687,8 +1862,8 @@ let unreadPrivateMsgs = {}; // { username: count }
                 if (data.text === "注册成功，请登录") {
                     alert(data.text);
                     isRegistering = false;
-                    authTitle.innerText = "登录聊天室";
-                    authBtn.innerText = "登录";
+                    authTitle.innerText = "欢迎回来";
+                    authBtn.innerText = "进入聊天室";
                     authSwitchText.innerText = "没有账号？";
                     authSwitchBtn.innerText = "立即注册";
                 } else {

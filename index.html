@@ -443,6 +443,27 @@ body {
         transform: scale(0.92);
         background: #e2e8f0;
     }
+    
+    #privateVoiceBtn {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: #f1f5f9;
+        color: #475569;
+        border: 1px solid rgba(15, 23, 42, 0.06);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: transform 0.2s, background 0.2s;
+        flex-shrink: 0;
+        padding: 0;
+    }
+    
+    #privateVoiceBtn:active {
+        transform: scale(0.92);
+        background: #e2e8f0;
+    }
 
     #privateSendBtn {
         width: 44px;
@@ -1487,13 +1508,15 @@ function syncAuthModeUI() {
             addSystem("未连接，稍后再试"); 
             return; 
         } 
-        const emoji = (prompt("输入表情(如 👍 ❤️ 😂)") || "").trim(); 
-        if (!emoji) return; 
-        if ((d.type === "pm" || d.type === "private") && activePrivateChat) { 
-            ws.send(JSON.stringify({type: "react_private", id: mid, emoji: emoji})); 
-        } else { 
-            ws.send(JSON.stringify({type: "react", id: mid, emoji: emoji})); 
-        } 
+        const isPrivate = (d.type === "pm" || d.type === "private") && activePrivateChat; 
+        showReactionPicker((emoji) => { 
+            if (!emoji) return; 
+            if (isPrivate) { 
+                ws.send(JSON.stringify({type: "react_private", id: mid, emoji: emoji})); 
+            } else { 
+                ws.send(JSON.stringify({type: "react", id: mid, emoji: emoji})); 
+            } 
+        }); 
     }); 
  
    if ((isMe || isAdmin) && (d.type === "chat" || d.type === "me" || d.type === "image" || d.type === "voice" || d.type === "pm" || d.type === "private") && !d.recalled) { 
@@ -1558,6 +1581,39 @@ function syncAuthModeUI() {
      addBtn("取消", () => {}, false); 
      actionSheet.style.display = "flex"; 
  } 
+
+function showReactionPicker(onPick) { 
+    const titleEl = document.getElementById("actionSheetTitle"); 
+    const rowEl = document.getElementById("actionSheetRow"); 
+    titleEl.innerText = "选择表情"; 
+    rowEl.innerHTML = ""; 
+    const emojis = ["😀","😂","😍","😭","👍","❤️","🔥","🎉","😡","😮","🙏","🤝"]; 
+    for (const e of emojis) { 
+        const b = document.createElement("button"); 
+        b.className = "sheetBtn"; 
+        b.type = "button"; 
+        b.innerText = e; 
+        b.style.width = "48px"; 
+        b.style.height = "48px"; 
+        b.style.borderRadius = "14px"; 
+        b.style.fontSize = "22px"; 
+        b.style.padding = "0"; 
+        b.onclick = () => { 
+            actionSheet.style.display = "none"; 
+            onPick(e); 
+        }; 
+        rowEl.appendChild(b); 
+    } 
+    const cancel = document.createElement("button"); 
+    cancel.className = "sheetBtn"; 
+    cancel.type = "button"; 
+    cancel.innerText = "取消"; 
+    cancel.onclick = () => { 
+        actionSheet.style.display = "none"; 
+    }; 
+    rowEl.appendChild(cancel); 
+    actionSheet.style.display = "flex"; 
+} 
  
  const messageEls = new Map(); 
  const messageData = new Map(); 

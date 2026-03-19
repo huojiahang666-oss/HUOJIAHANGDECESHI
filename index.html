@@ -546,6 +546,7 @@
  let isLockedRoom = false; 
  let ownerName = ""; 
  let isOwner = false; 
+ let userRole = "user";
 
  let isRegistering = false;
  const authModal = document.getElementById("authModal");
@@ -657,60 +658,61 @@
      const d = messageData.get(mid); 
      if (!d) return; 
      const sender = d.type === "pm" ? d.from : d.user; 
-     const isMe = sender === username; 
-     const titleEl = document.getElementById("actionSheetTitle"); 
-     const rowEl = document.getElementById("actionSheetRow"); 
-     titleEl.innerText = (sender || "") + (d.type === "pm" ? " (私聊)" : ""); 
-     rowEl.innerHTML = ""; 
+    const isMe = sender === username; 
+    const isAdmin = userRole === "admin";
+    const titleEl = document.getElementById("actionSheetTitle"); 
+    const rowEl = document.getElementById("actionSheetRow"); 
+    titleEl.innerText = (sender || "") + (d.type === "pm" ? " (私聊)" : ""); 
+    rowEl.innerHTML = ""; 
  
-     const addBtn = (label, onClick, danger) => { 
-         const b = document.createElement("button"); 
-         b.className = "sheetBtn" + (danger ? " sheetBtnDanger" : ""); 
-         b.type = "button"; 
-         b.innerText = label; 
-         b.onclick = () => { 
-             actionSheet.style.display = "none"; 
-             onClick(); 
-         }; 
-         rowEl.appendChild(b); 
-     }; 
+    const addBtn = (label, onClick, danger) => { 
+        const b = document.createElement("button"); 
+        b.className = "sheetBtn" + (danger ? " sheetBtnDanger" : ""); 
+        b.type = "button"; 
+        b.innerText = label; 
+        b.onclick = () => { 
+            actionSheet.style.display = "none"; 
+            onClick(); 
+        }; 
+        rowEl.appendChild(b); 
+    }; 
  
-     addBtn("回复", () => setReplyTarget(mid)); 
-     addBtn("表态", () => { 
-         if (!ws || ws.readyState !== WebSocket.OPEN) { 
-             addSystem("未连接，稍后再试"); 
-             return; 
-         } 
-         const emoji = (prompt("输入表情(如 👍 ❤️ 😂)") || "").trim(); 
-         if (!emoji) return; 
-         ws.send(JSON.stringify({type: "react", id: mid, emoji: emoji})); 
-     }); 
+    addBtn("回复", () => setReplyTarget(mid)); 
+    addBtn("表态", () => { 
+        if (!ws || ws.readyState !== WebSocket.OPEN) { 
+            addSystem("未连接，稍后再试"); 
+            return; 
+        } 
+        const emoji = (prompt("输入表情(如 👍 ❤️ 😂)") || "").trim(); 
+        if (!emoji) return; 
+        ws.send(JSON.stringify({type: "react", id: mid, emoji: emoji})); 
+    }); 
  
-     if (isMe && (d.type === "chat" || d.type === "me") && !d.recalled) { 
-         addBtn("撤回", () => { 
-             if (ws && ws.readyState === WebSocket.OPEN) { 
-                 ws.send(JSON.stringify({type: "recall", id: mid})); 
-             } 
-         }, true); 
-     } 
+    if ((isMe || isAdmin) && (d.type === "chat" || d.type === "me") && !d.recalled) { 
+        addBtn("撤回", () => { 
+            if (ws && ws.readyState === WebSocket.OPEN) { 
+                ws.send(JSON.stringify({type: "recall", id: mid})); 
+            } 
+        }, true); 
+    } 
  
-     if (isLockedRoom && isOwner && sender && sender !== username) { 
-         addBtn("踢出", () => { 
-             if (ws && ws.readyState === WebSocket.OPEN) { 
-                 ws.send(JSON.stringify({type: "command", cmd: "kick", user: sender})); 
-             } 
-         }, true); 
-         addBtn("禁言", () => { 
-             if (ws && ws.readyState === WebSocket.OPEN) { 
-                 ws.send(JSON.stringify({type: "command", cmd: "mute", user: sender})); 
-             } 
-         }, true); 
-         addBtn("解禁", () => { 
-             if (ws && ws.readyState === WebSocket.OPEN) { 
-                 ws.send(JSON.stringify({type: "command", cmd: "unmute", user: sender})); 
-             } 
-         }); 
-     } 
+    if ((isLockedRoom && isOwner || isAdmin) && sender && sender !== username) { 
+        addBtn("踢出", () => { 
+            if (ws && ws.readyState === WebSocket.OPEN) { 
+                ws.send(JSON.stringify({type: "command", cmd: "kick", user: sender})); 
+            } 
+        }, true); 
+        addBtn("禁言", () => { 
+            if (ws && ws.readyState === WebSocket.OPEN) { 
+                ws.send(JSON.stringify({type: "command", cmd: "mute", user: sender})); 
+            } 
+        }, true); 
+        addBtn("解禁", () => { 
+            if (ws && ws.readyState === WebSocket.OPEN) { 
+                ws.send(JSON.stringify({type: "command", cmd: "unmute", user: sender})); 
+            } 
+        }); 
+    } 
  
      if (sender && sender !== username) { 
          if (blocked.has(sender)) { 
@@ -1174,6 +1176,7 @@ msgInput.addEventListener("focus", () => {
                     authSwitchBtn.innerText = "立即注册";
                 } else {
                     username = data.user;
+                    userRole = data.role || "user";
                     localStorage.setItem("chat_username", username);
                     if (data.token) {
                         localStorage.setItem("chat_token", data.token);

@@ -2,7 +2,7 @@
  <html lang="zh"> 
  <head> 
  <meta charset="UTF-8"> 
- <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"> 
+ <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"> 
  <title>聊天室</title> 
  
  <style> 
@@ -52,19 +52,19 @@
  
  /* 主区域 */ 
 #main { 
-        position: absolute; /* 改为 absolute，配合 visualViewport 使用更稳定 */
+        position: fixed; 
         top: 0;
         left: 0; 
         right: 0; 
+        bottom: 0;
         display: flex; 
         flex-direction: column; 
         width: 100%; 
         max-width: 980px; 
         margin: 0 auto; 
         background: transparent; 
-        height: 100dvh; 
         overflow: hidden; 
-        will-change: height, top; 
+        will-change: height, top, bottom; 
     } 
 
 /* 顶部 */ 
@@ -253,14 +253,14 @@
     }
     
     #friendsPage, #privateChatPage {
-        position: absolute; /* 改为 absolute 增强 mobile 兼容性 */
+        position: fixed;
         inset: 0;
         display: none;
         flex-direction: column;
         background: rgba(255,255,255,0.98);
         z-index: 5000;
         overflow: hidden;
-        will-change: height, top;
+        will-change: height, top, bottom;
     }
     
     .friendItem {
@@ -1716,11 +1716,10 @@ imageInput.addEventListener("change", (e) => {
     // 移除导致抖动的强制滚动
     updateHeight(); 
 }); 
-msgInput.addEventListener("focus", (e) => { 
-    // 强制立即更新布局
+msgInput.addEventListener("focus", () => { 
     setTimeout(() => {
         updateHeight();
-        e.target.scrollIntoView({ block: 'center' });
+        chat.scrollTop = chat.scrollHeight;
     }, 300);
 }); 
  
@@ -2273,10 +2272,10 @@ privateSendBtn.addEventListener("click", () => {
     }
 });
 
-privateMsgInput.addEventListener("focus", (e) => {
+privateMsgInput.addEventListener("focus", () => {
     setTimeout(() => {
         updateHeight();
-        e.target.scrollIntoView({ block: 'center' });
+        privateChatList.scrollTop = privateChatList.scrollHeight;
     }, 300);
 });
 
@@ -2475,71 +2474,47 @@ function updateHeight() {
     const membersPage = document.getElementById("membersPage");
     const inputArea = document.getElementById("inputArea");
     const privateInputArea = document.getElementById("privateInputArea");
+    
+    if (!window.visualViewport) return;
+
+    const { height, offsetTop } = window.visualViewport;
+    const viewportHeight = window.innerHeight;
+    const keyboardHeight = Math.max(0, viewportHeight - height - offsetTop);
+    
     const wasNearBottom = (chat.scrollHeight - chat.scrollTop - chat.clientHeight) < 60; 
 
-    if (window.visualViewport) { 
-        const { height, offsetTop } = window.visualViewport; 
-        
-        // 当 offsetTop 为 0 时，说明键盘已收起，立即恢复满屏状态，消除空白闪烁
-        if (offsetTop <= 0) {
-            const fullHeight = "100dvh";
-            const targets = [main, friendsPage, privateChatPage, membersPage];
-            targets.forEach(el => {
-                if (el) {
-                    el.style.height = fullHeight;
-                    el.style.top = "0px";
-                }
-            });
-            if (inputArea) inputArea.style.paddingBottom = "env(safe-area-inset-bottom)";
-            if (privateInputArea) privateInputArea.style.paddingBottom = "0px";
-            lastHeight = 0;
-            lastOffsetTop = 0;
-        } else {
-            // 同步更新 top 和 height，确保容器始终精准覆盖可视区域
-            if (Math.abs(lastHeight - height) > 1 || Math.abs(lastOffsetTop - offsetTop) > 1) {
-                const hStr = height + "px";
-                const tStr = offsetTop + "px";
-                const targets = [main, friendsPage, privateChatPage, membersPage];
-                targets.forEach(el => {
-                    if (el) {
-                        el.style.height = hStr;
-                        el.style.top = tStr;
-                    }
-                });
-                
-                // 键盘弹出时移除安全区内边距，避免输入框被推得太高
-                if (inputArea) inputArea.style.paddingBottom = "0px";
-                if (privateInputArea) privateInputArea.style.paddingBottom = "0px";
-                lastHeight = height;
-                lastOffsetTop = offsetTop;
-            }
+    // 设置容器位置
+    const targets = [main, friendsPage, privateChatPage, membersPage];
+    targets.forEach(el => {
+        if (el) {
+            // 使用 bottom 避让键盘，top 锁定在顶部，这是最稳健的 mobile 布局方案
+            el.style.position = "fixed";
+            el.style.top = offsetTop + "px";
+            el.style.height = height + "px";
+            el.style.bottom = keyboardHeight + "px";
         }
-        
-        if (wasNearBottom) {
-            chat.scrollTop = chat.scrollHeight;
-        }
-        
-        // 如果正在私聊，也要确保底部滚动
-        if (activePrivateChat && privateChatList) {
-            privateChatList.scrollTop = privateChatList.scrollHeight;
-        }
-        
-        // 核心：强制 body 回位，使用延时确保在系统行为之后触发
-        setTimeout(() => {
-            if (window.scrollY !== 0) {
-                window.scrollTo(0, 0);
-            }
-        }, 50); // 稍微增加延迟，让滚动更彻底
-    } else { 
-        const fullHeight = "100dvh";
-        const targets = [main, friendsPage, privateChatPage, membersPage];
-        targets.forEach(el => {
-            if (el) {
-                el.style.height = fullHeight;
-                el.style.top = "0px";
-            }
-        });
-    } 
+    });
+
+    // 适配安全区
+    if (keyboardHeight > 1) {
+        if (inputArea) inputArea.style.paddingBottom = "0px";
+        if (privateInputArea) privateInputArea.style.paddingBottom = "0px";
+    } else {
+        if (inputArea) inputArea.style.paddingBottom = "env(safe-area-inset-bottom)";
+    }
+
+    // 滚动对齐
+    if (wasNearBottom) {
+        chat.scrollTop = chat.scrollHeight;
+    }
+    if (activePrivateChat && privateChatList) {
+        privateChatList.scrollTop = privateChatList.scrollHeight;
+    }
+
+    // 强制复位 body，防止系统由于键盘行为导致页面整体滚动
+    setTimeout(() => {
+        if (window.scrollY !== 0) window.scrollTo(0, 0);
+    }, 50);
 } 
 
 if (window.visualViewport) { 

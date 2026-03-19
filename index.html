@@ -468,24 +468,44 @@
  </div> 
 
  <!-- 登录/注册 模态框 -->
- <div id="authModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:10000;">
-    <div style="background:white;padding:30px;border-radius:18px;width:320px;box-shadow:var(--shadow);">
-        <h2 id="authTitle" style="margin-top:0;text-align:center;">登录聊天室</h2>
-        <div style="margin-bottom:15px;">
-            <label style="display:block;margin-bottom:5px;font-size:14px;">用户名</label>
-            <input id="auth_user" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;">
-        </div>
-        <div style="margin-bottom:20px;">
-            <label style="display:block;margin-bottom:5px;font-size:14px;">密码</label>
-            <input id="auth_pass" type="password" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;">
-        </div>
-        <button id="auth_btn" style="width:100%;padding:12px;margin-bottom:10px;">登录</button>
-        <div style="text-align:center;font-size:13px;color:#666;">
-            <span id="auth_switch_text">没有账号？</span>
-            <a href="#" id="auth_switch_btn" style="color:var(--accent);text-decoration:none;">立即注册</a>
-        </div>
-    </div>
- </div>
+  <div id="authModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:10000;">
+     <div style="background:white;padding:30px;border-radius:18px;width:340px;box-shadow:var(--shadow);">
+         <h2 id="authTitle" style="margin-top:0;text-align:center;">登录聊天室</h2>
+         
+         <div id="auth_fields">
+             <div style="margin-bottom:12px;">
+                 <label style="display:block;margin-bottom:5px;font-size:14px;">用户名</label>
+                 <input id="auth_user" placeholder="3-30位字符" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;">
+             </div>
+             
+             <!-- 注册时显示的邮箱字段 -->
+             <div id="reg_email_field" style="display:none;margin-bottom:12px;">
+                 <label style="display:block;margin-bottom:5px;font-size:14px;">电子邮箱</label>
+                 <div style="display:flex;gap:8px;">
+                     <input id="auth_email" placeholder="用于接收验证码" style="flex:1;padding:10px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;">
+                     <button id="send_code_btn" style="width:100px;font-size:12px;background:#f2f2f2;color:#333;border:1px solid #ddd;">发送验证码</button>
+                 </div>
+             </div>
+
+             <!-- 注册时显示的验证码字段 -->
+             <div id="reg_code_field" style="display:none;margin-bottom:12px;">
+                 <label style="display:block;margin-bottom:5px;font-size:14px;">验证码</label>
+                 <input id="auth_code" placeholder="6位数字" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;">
+             </div>
+
+             <div style="margin-bottom:20px;">
+                 <label style="display:block;margin-bottom:5px;font-size:14px;">密码</label>
+                 <input id="auth_pass" type="password" placeholder="请输入密码" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;">
+             </div>
+         </div>
+
+         <button id="auth_btn" style="width:100%;padding:12px;margin-bottom:10px;">登录</button>
+         <div style="text-align:center;font-size:13px;color:#666;">
+             <span id="auth_switch_text">没有账号？</span>
+             <a href="#" id="auth_switch_btn" style="color:var(--accent);text-decoration:none;">立即注册</a>
+         </div>
+     </div>
+  </div>
 
  <script> 
  let username = ""; 
@@ -520,6 +540,11 @@
  const authSwitchText = document.getElementById("auth_switch_text");
  const authUser = document.getElementById("auth_user");
  const authPass = document.getElementById("auth_pass");
+ const authEmail = document.getElementById("auth_email");
+ const authCode = document.getElementById("auth_code");
+ const regEmailField = document.getElementById("reg_email_field");
+ const regCodeField = document.getElementById("reg_code_field");
+ const sendCodeBtn = document.getElementById("send_code_btn");
 
  authSwitchBtn.addEventListener("click", (e) => {
      e.preventDefault();
@@ -528,21 +553,64 @@
      authBtn.innerText = isRegistering ? "立即注册" : "登录";
      authSwitchText.innerText = isRegistering ? "已有账号？" : "没有账号？";
      authSwitchBtn.innerText = isRegistering ? "立即登录" : "立即注册";
+     
+     // 切换显示邮箱和验证码字段
+     regEmailField.style.display = isRegistering ? "block" : "none";
+     regCodeField.style.display = isRegistering ? "block" : "none";
+ });
+
+ sendCodeBtn.addEventListener("click", () => {
+     const email = authEmail.value.trim();
+     if (!email || !email.includes("@")) {
+         alert("请输入正确的邮箱地址");
+         return;
+     }
+     if (ws && ws.readyState === WebSocket.OPEN) {
+         ws.send(JSON.stringify({
+             type: "request_code",
+             email: email
+         }));
+         
+         // 按钮倒计时
+         sendCodeBtn.disabled = true;
+         let count = 60;
+         const timer = setInterval(() => {
+             sendCodeBtn.innerText = count + "s";
+             if (count-- <= 0) {
+                 clearInterval(timer);
+                 sendCodeBtn.disabled = false;
+                 sendCodeBtn.innerText = "发送验证码";
+             }
+         }, 1000);
+     }
  });
 
  authBtn.addEventListener("click", () => {
      const user = authUser.value.trim();
      const pass = authPass.value.trim();
+     const email = authEmail.value.trim();
+     const code = authCode.value.trim();
+
      if (!user || !pass) {
          alert("请输入用户名和密码");
          return;
      }
+     if (isRegistering && (!email || !code)) {
+         alert("请输入邮箱和验证码");
+         return;
+     }
+
      if (ws && ws.readyState === WebSocket.OPEN) {
-         ws.send(JSON.stringify({
+         const payload = {
              type: isRegistering ? "register" : "login",
              user: user,
              pass: pass
-         }));
+         };
+         if (isRegistering) {
+             payload.email = email;
+             payload.code = code;
+         }
+         ws.send(JSON.stringify(payload));
      } else {
          alert("服务器未连接，请刷新重试");
      }
@@ -1050,6 +1118,11 @@ msgInput.addEventListener("focus", () => {
                     authModal.style.display = "none";
                     ws.send(JSON.stringify({user: username, room: displayRoom, roomKey: roomKey || undefined}));
                 }
+                return;
+            }
+
+            if (data.type === "code_sent") {
+                alert(data.text);
                 return;
             }
 

@@ -1639,8 +1639,7 @@ let unreadPrivateMsgs = {}; // { username: count }
                 return;
             }
 
-            if (data.type === "deleted_by_friend") {
-                addSystem(data.text || "对方将你从好友列表中删除了");
+            if (data.type === "friends_list_silent_refresh") {
                 if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({type: "get_friends"}));
                 return;
             }
@@ -2045,7 +2044,9 @@ function addPrivateMessage(data) {
     const msg = document.createElement("div");
     msg.className = "message " + (isMe ? "right" : "left");
     
-    msg.innerHTML = `<img class="avatar" src="https://api.dicebear.com/7.x/identicon/svg?seed=${data.from}">
+    const avatarUrl = data.avatar || "https://api.dicebear.com/7.x/identicon/svg?seed=" + (data.from || "anon");
+    
+    msg.innerHTML = `<img class="avatar" src="${avatarUrl}">
                      <div class="msg_content">
                         <div class="bubble">${data.text}</div>
                         <div class="time">${data.time}</div>

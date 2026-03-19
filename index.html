@@ -1482,7 +1482,7 @@ function syncAuthModeUI() {
         ws.send(JSON.stringify({type: "react", id: mid, emoji: emoji})); 
     }); 
  
-    if ((isMe || isAdmin) && (d.type === "chat" || d.type === "me") && !d.recalled) { 
+    if ((isMe || isAdmin) && (d.type === "chat" || d.type === "me" || d.type === "image" || d.type === "voice") && !d.recalled) { 
         addBtn("撤回", () => { 
             if (ws && ws.readyState === WebSocket.OPEN) { 
                 ws.send(JSON.stringify({type: "recall", id: mid})); 
@@ -2267,7 +2267,10 @@ let unreadPrivateMsgs = {}; // { username: count }
                     updateFriendBadge(); // 更新顶部好友按钮的红点
                     
                     // 显示 Toast 弹窗
-                    showToast(data.from, data.msg_type === "image" ? "[图片]" : data.text);
+                    showToast(
+                        data.from,
+                        data.msg_type === "image" ? "[图片]" : (data.msg_type === "voice" ? "[语音]" : data.text)
+                    );
                 }
                 return;
             }

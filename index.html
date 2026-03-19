@@ -23,6 +23,7 @@
     height: 100%; 
     overflow: hidden; 
     overscroll-behavior: none; 
+    background-color: #0b1220; /* 强制背景色，消除空白闪烁 */
 } 
  
  body { 
@@ -50,7 +51,7 @@
  /* 主区域 */ 
 #main { 
     position: fixed; 
-    top: 0; 
+    bottom: 0; /* 改为底部固定 */
     left: 0; 
     right: 0; 
     display: flex; 
@@ -62,8 +63,7 @@
     height: 100vh; 
     height: 100dvh; 
     overflow: hidden; 
-    /* 提升移动端平滑度 */ 
-    will-change: height, top; 
+    will-change: height; 
 } 
 
 /* 顶部 */ 
@@ -1094,8 +1094,11 @@ imageInput.addEventListener("change", (e) => {
     updateHeight(); 
 }); 
 msgInput.addEventListener("focus", () => { 
-    // 移除导致抖动的强制滚动
+    // 强制立即更新，并尝试将输入框滚动到视口
     updateHeight(); 
+    setTimeout(() => {
+        msgInput.scrollIntoView({ block: 'center' });
+    }, 300);
 }); 
  
  let ws; 
@@ -1319,39 +1322,35 @@ document.getElementById("exitRoom").addEventListener("click", () => {
      location.search = "?room=lobby"; 
  }); 
  
- /* ✅ 终极防遮挡 - 优化抖动版 */ 
+ /* ✅ 终极防遮挡 - 极速响应版 */ 
 let updateHeightPending = false; 
 let lastHeight = 0;
-let lastOffsetTop = 0;
 
 function updateHeight() { 
-    if (updateHeightPending) return; 
-    updateHeightPending = true; 
-    
-    requestAnimationFrame(() => { 
-        const chat = document.getElementById("chat"); 
-        const main = document.getElementById("main"); 
-        const wasNearBottom = (chat.scrollHeight - chat.scrollTop - chat.clientHeight) < 60; 
+    const chat = document.getElementById("chat"); 
+    const main = document.getElementById("main"); 
+    const wasNearBottom = (chat.scrollHeight - chat.scrollTop - chat.clientHeight) < 60; 
 
-        if (window.visualViewport) { 
-            const { height, offsetTop } = window.visualViewport; 
+    if (window.visualViewport) { 
+        const { height } = window.visualViewport; 
+        
+        if (Math.abs(lastHeight - height) > 1) {
+            main.style.height = height + "px"; 
+            lastHeight = height;
             
-            // 只有显著变化才更新，减少抖动
-            if (Math.abs(lastHeight - height) > 1 || Math.abs(lastOffsetTop - offsetTop) > 1) {
-                main.style.height = height + "px"; 
-                main.style.top = offsetTop + "px"; 
-                lastHeight = height;
-                lastOffsetTop = offsetTop;
+            // 立即滚动到底部
+            if (wasNearBottom) {
+                chat.scrollTop = chat.scrollHeight;
             }
-        } else { 
-            main.style.height = window.innerHeight + "px"; 
-        } 
-
-        if (wasNearBottom) { 
-            scrollBottom(true); 
-        } 
-        updateHeightPending = false; 
-    }); 
+        }
+        
+        // 强制重置滚动，防止页面整体被顶起后不回位
+        if (window.scrollY !== 0) {
+            window.scrollTo(0, 0);
+        }
+    } else { 
+        main.style.height = window.innerHeight + "px"; 
+    } 
 } 
 
 if (window.visualViewport) { 

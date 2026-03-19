@@ -898,6 +898,7 @@ body {
     overflow-y: auto; 
     overscroll-behavior-y: contain; 
     -webkit-overflow-scrolling: touch; /* 增强 iOS 滚动 */
+    position: relative;
     padding: 14px; 
     box-sizing: border-box; 
     margin: 12px 10px 12px 10px; 
@@ -910,6 +911,33 @@ body {
     transform: translateZ(0);
     -webkit-user-drag: none;
 } 
+
+#onlineCountOverlay {
+    position: sticky;
+    top: 50%;
+    height: 0;
+    z-index: 0;
+    pointer-events: none;
+}
+
+#onlineCountOverlayText {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    transform: translateY(-50%);
+    text-align: center;
+    font-size: 72px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: rgba(15, 23, 42, 0.14);
+    user-select: none;
+}
+
+#messageList {
+    position: relative;
+    z-index: 1;
+}
  
  /* 消息 */ 
  .message { 
@@ -1204,6 +1232,7 @@ body {
          <div id="loadMore" class="loadMore"> 
              <button class="loadMoreBtn" onclick="loadMoreHistory()">查看更多历史消息</button> 
          </div> 
+         <div id="onlineCountOverlay"><div id="onlineCountOverlayText">0</div></div>
          <div id="messageList"></div> 
      </div> 
  
@@ -1520,6 +1549,7 @@ function syncAuthModeUI() {
  const emojiToggle = document.getElementById("emojiToggle"); 
 const imageToggle = document.getElementById("imageToggle"); 
 const imageInput = document.getElementById("imageInput"); 
+const onlineCountOverlayText = document.getElementById("onlineCountOverlayText");
 
 imageToggle.addEventListener("click", () => imageInput.click()); 
 imageInput.addEventListener("change", (e) => { 
@@ -1749,8 +1779,8 @@ imageInput.addEventListener("change", (e) => {
      return colors[h % colors.length]; 
  } 
  
- function updateTopBar(countText, typingText) { 
-    const title = "聊天室" + (isLockedRoom ? " 🔒" : "") + (countText ? (" · " + countText) : ""); 
+function updateTopBar(countText, typingText) { 
+   const title = "聊天室" + (isLockedRoom ? " 🔒" : ""); 
     const titleEl = document.getElementById("roomTitle");
     if (titleEl.innerText !== title) titleEl.innerText = title;
     
@@ -1764,7 +1794,6 @@ imageInput.addEventListener("change", (e) => {
     if (exitBtn.style.display !== d) exitBtn.style.display = d;
 } 
  updateTopBar("", ""); 
- let lastCountText = ""; 
  
  const defaultTitle = document.title; 
  let unreadCount = 0; 
@@ -1871,7 +1900,7 @@ imageInput.addEventListener("change", (e) => {
      else typingUsers.delete(user); 
      const list = Array.from(typingUsers).slice(0, 2); 
      const text = list.length ? (list.join("、") + " 正在输入…") : ""; 
-     updateTopBar(lastCountText, text); 
+    updateTopBar("", text); 
  } 
  
  const myAvatar = document.getElementById("myAvatar");
@@ -2211,7 +2240,7 @@ let unreadPrivateMsgs = {}; // { username: count }
                 isLockedRoom = !!data.locked; 
                 ownerName = data.owner || ""; 
                 isOwner = !!data.isOwner; 
-                updateTopBar(lastCountText, typingUsers.size ? (Array.from(typingUsers).slice(0,2).join("、") + " 正在输入…") : ""); 
+               updateTopBar("", typingUsers.size ? (Array.from(typingUsers).slice(0,2).join("、") + " 正在输入…") : ""); 
                 if (isLockedRoom) { 
                     addSystem("已进入密码房间"); 
                 } 
@@ -2268,7 +2297,7 @@ let unreadPrivateMsgs = {}; // { username: count }
             if (data.type === "roomOwner") { 
              ownerName = data.owner || ""; 
              isOwner = ownerName === username; 
-             updateTopBar(lastCountText, typingUsers.size ? (Array.from(typingUsers).slice(0,2).join("、") + " 正在输入…") : ""); 
+            updateTopBar("", typingUsers.size ? (Array.from(typingUsers).slice(0,2).join("、") + " 正在输入…") : ""); 
          } 
  
          if (data.type === "kicked") { 
@@ -2282,12 +2311,12 @@ let unreadPrivateMsgs = {}; // { username: count }
          } 
  
          if (data.type === "count") { 
-             lastCountText = "在线人数: " + data.count; 
             if (data.owner !== undefined) { 
                 ownerName = data.owner || ""; 
                 isOwner = ownerName === username; 
             } 
-             updateTopBar(lastCountText, typingUsers.size ? (Array.from(typingUsers).slice(0,2).join("、") + " 正在输入…") : ""); 
+            if (onlineCountOverlayText) onlineCountOverlayText.innerText = String(data.count || 0);
+            updateTopBar("", typingUsers.size ? (Array.from(typingUsers).slice(0,2).join("、") + " 正在输入…") : ""); 
          } 
  
          if (data.type === "system") { 

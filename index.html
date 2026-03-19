@@ -440,7 +440,8 @@
             <button class="topBtn" id="searchToggle">搜索</button> 
             <button class="topBtn" id="showHelp">说明</button> 
             <button class="topBtn" id="clearChat">清屏</button> 
-            <button class="topBtn" id="exitRoom" style="display:none;">退出</button> 
+            <button class="topBtn" id="logoutBtn" style="background:rgba(239, 68, 68, 0.2);color:#ef4444;">退出</button>
+            <button class="topBtn" id="exitRoom" style="display:none;">退出房间</button> 
         </div> 
      </div> 
       <div id="chat"> 
@@ -1272,6 +1273,18 @@ msgInput.addEventListener("focus", () => {
         messageEls.clear();
         messageData.clear();
         addSystem("本地聊天记录已清屏");
+    }
+});
+
+document.getElementById("logoutBtn").addEventListener("click", () => {
+    if (confirm("确定要退出登录吗？")) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({type: "logout"}));
+        }
+        localStorage.removeItem("chat_token");
+        localStorage.removeItem("chat_username");
+        localStorage.removeItem("chat_avatar");
+        location.reload();
     }
 });
 

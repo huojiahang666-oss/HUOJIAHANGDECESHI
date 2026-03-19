@@ -1097,10 +1097,8 @@
 
  // 为登录注册输入框添加防遮挡处理
 [authUser, authPass, authEmail, authCode].forEach(input => {
-    input.addEventListener('focus', (e) => {
-        setTimeout(() => {
-            e.target.scrollIntoView({ block: 'center', behavior: 'smooth' });
-        }, 300);
+    input.addEventListener('focus', () => {
+        setTimeout(updateHeight, 100);
     });
 });
 
@@ -1716,12 +1714,11 @@ imageInput.addEventListener("change", (e) => {
     // 移除导致抖动的强制滚动
     updateHeight(); 
 }); 
-msgInput.addEventListener("focus", (e) => { 
+msgInput.addEventListener("focus", () => { 
     setTimeout(() => {
         updateHeight();
         chat.scrollTop = chat.scrollHeight;
-        e.target.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    }, 300);
+    }, 100);
 }); 
  
  let ws; 
@@ -2273,12 +2270,11 @@ privateSendBtn.addEventListener("click", () => {
     }
 });
 
-privateMsgInput.addEventListener("focus", (e) => {
+privateMsgInput.addEventListener("focus", () => {
     setTimeout(() => {
         updateHeight();
         privateChatList.scrollTop = privateChatList.scrollHeight;
-        e.target.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    }, 300);
+    }, 100);
 });
 
 privateMsgInput.addEventListener("blur", () => {
@@ -2522,12 +2518,12 @@ function updateHeight() {
             privateChatList.scrollTop = privateChatList.scrollHeight;
         }
 
-        // 核心：强制 body 复位。使用 setTimeout 确保在系统默认滚动行为之后触发
+        // 核心：强制 body 复位。使用更短的延迟以消除页面拉扯
         setTimeout(() => {
             if (window.scrollY !== 0) {
                 window.scrollTo(0, 0);
             }
-        }, 30);
+        }, 10);
     });
 } 
 

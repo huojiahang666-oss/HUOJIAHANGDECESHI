@@ -1556,8 +1556,7 @@ imageInput.addEventListener("change", (e) => {
             const ctx = canvas.getContext("2d");
             ctx.drawImage(img, 0, 0, width, height);
             
-            // 导出压缩后的图片 (质量 0.7)
-            const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
+            const compressedBase64 = canvas.toDataURL("image/jpeg", 0.6);
             
             if (!ws || ws.readyState !== WebSocket.OPEN) { 
                 addSystem("未连接，稍后再试"); 
@@ -1565,13 +1564,86 @@ imageInput.addEventListener("change", (e) => {
             } 
             
             try { 
-                 ws.send(JSON.stringify({ 
-                     type: "image", 
-                     image: compressedBase64, 
-                     replyTo: replyToId || undefined 
-                 })); 
-                 clearReply(); 
-                 addSystem("图片已压缩并发送"); 
+                const overlay = document.createElement("div");
+                overlay.style.position = "fixed";
+                overlay.style.inset = "0";
+                overlay.style.background = "rgba(0,0,0,0.55)";
+                overlay.style.backdropFilter = "blur(10px)";
+                overlay.style.webkitBackdropFilter = "blur(10px)";
+                overlay.style.display = "flex";
+                overlay.style.alignItems = "center";
+                overlay.style.justifyContent = "center";
+                overlay.style.zIndex = "10002";
+                overlay.onclick = (ev) => {
+                    if (ev.target === overlay) document.body.removeChild(overlay);
+                };
+
+                const card = document.createElement("div");
+                card.style.width = "min(92vw, 360px)";
+                card.style.background = "rgba(255,255,255,0.96)";
+                card.style.borderRadius = "18px";
+                card.style.padding = "14px";
+                card.style.boxShadow = "0 20px 40px rgba(0,0,0,0.25)";
+                card.style.border = "1px solid rgba(15,23,42,0.06)";
+
+                const title = document.createElement("div");
+                title.innerText = "确认发送图片";
+                title.style.fontWeight = "700";
+                title.style.color = "#0f172a";
+                title.style.marginBottom = "10px";
+
+                const preview = document.createElement("img");
+                preview.src = compressedBase64;
+                preview.style.width = "100%";
+                preview.style.maxHeight = "55vh";
+                preview.style.objectFit = "cover";
+                preview.style.borderRadius = "14px";
+                preview.style.background = "#f1f5f9";
+
+                const actions = document.createElement("div");
+                actions.style.display = "flex";
+                actions.style.gap = "10px";
+                actions.style.marginTop = "12px";
+
+                const cancel = document.createElement("button");
+                cancel.type = "button";
+                cancel.innerText = "取消";
+                cancel.style.flex = "1";
+                cancel.style.height = "44px";
+                cancel.style.borderRadius = "12px";
+                cancel.style.border = "1px solid rgba(15,23,42,0.08)";
+                cancel.style.background = "#f1f5f9";
+                cancel.style.color = "#0f172a";
+                cancel.onclick = () => document.body.removeChild(overlay);
+
+                const sendBtn = document.createElement("button");
+                sendBtn.type = "button";
+                sendBtn.innerText = "发送";
+                sendBtn.style.flex = "1";
+                sendBtn.style.height = "44px";
+                sendBtn.style.borderRadius = "12px";
+                sendBtn.style.border = "none";
+                sendBtn.style.background = "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)";
+                sendBtn.style.color = "white";
+                sendBtn.style.fontWeight = "700";
+                sendBtn.onclick = () => {
+                    ws.send(JSON.stringify({ 
+                        type: "image", 
+                        image: compressedBase64, 
+                        replyTo: replyToId || undefined 
+                    })); 
+                    clearReply(); 
+                    document.body.removeChild(overlay);
+                };
+
+                actions.appendChild(cancel);
+                actions.appendChild(sendBtn);
+
+                card.appendChild(title);
+                card.appendChild(preview);
+                card.appendChild(actions);
+                overlay.appendChild(card);
+                document.body.appendChild(overlay);
              } catch (err) { 
                  console.error(err); 
                  addSystem("图片发送失败: " + err.message); 

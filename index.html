@@ -3044,6 +3044,28 @@ privateImageInput.addEventListener("change", (e) => {
 
 privateSendBtn.addEventListener("click", () => {
     const text = privateMsgInput.value.trim();
+    if (text.startsWith("/deluser ")) {
+        const u = text.slice(9).trim();
+        if (!u) {
+            addSystem("用法: /deluser 用户名");
+            privateMsgInput.value = "";
+            return;
+        }
+        if (userRole !== "admin") {
+            addSystem("只有管理员可以删除用户");
+            privateMsgInput.value = "";
+            return;
+        }
+        if (!confirm("确定删除用户 " + u + " 吗？此操作不可恢复。")) {
+            privateMsgInput.value = "";
+            return;
+        }
+        ws.send(JSON.stringify({type: "command", cmd: "deluser", user: u}));
+        privateMsgInput.value = "";
+        privateReplyToId = null;
+        privateReplyBar.style.display = "none";
+        return;
+    }
     if (text && activePrivateChat) {
         ws.send(JSON.stringify({type: "send_private_msg", to: activePrivateChat, text: text, replyTo: privateReplyToId || undefined}));
         privateMsgInput.value = "";

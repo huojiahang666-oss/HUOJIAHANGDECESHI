@@ -1207,6 +1207,30 @@ msgInput.addEventListener("focus", () => {
          location.search = "?room=lobby";
      } catch {}
  }
+ function kickedToLobby(text, banSeconds) {
+     shouldReconnect = false;
+     forcedLogout = false;
+     try {
+         if (text) addSystem(text);
+     } catch {}
+     try {
+         if (banSeconds) {
+             const mins = Math.max(1, Math.ceil(banSeconds / 60));
+             alert((text || "你已被踢出房间") + `（${mins}分钟内不可进入）`);
+         } else if (text) {
+             alert(text);
+         }
+     } catch {}
+     roomKey = "";
+     roomId = null;
+     isLockedRoom = false;
+     try {
+         if (ws) ws.close();
+     } catch {}
+     try {
+         location.search = "?room=lobby";
+     } catch {}
+ }
  function connect() { 
      ws = new WebSocket("wss://ducally-chemiluminescent-zenaida.ngrok-free.dev"); 
  
@@ -1333,10 +1357,7 @@ msgInput.addEventListener("focus", () => {
  
          if (data.type === "kicked") { 
             const kickedMsg = data.text || "你已被踢出房间"; 
-            try { 
-                alert(kickedMsg); 
-            } catch {} 
-            forceLogout(kickedMsg);
+            kickedToLobby(kickedMsg, data.banSeconds);
              return; 
          } 
  

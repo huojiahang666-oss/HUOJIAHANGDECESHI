@@ -1567,10 +1567,20 @@ function syncAuthModeUI() {
                 };
                 
                 mediaRecorder.onstop = async () => {
+                    // 使用标准的 audio/webm，但在某些浏览器中可能需要更广泛的兼容性
                     const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    
+                    // 检查 Blob 是否有效
+                    if (audioBlob.size === 0) {
+                        console.error("录音文件为空");
+                        return;
+                    }
+
                     const reader = new FileReader();
                     reader.onloadend = () => {
                         const base64Audio = reader.result;
+                        
+                        // 额外校验：如果是 iOS 微信或某些特殊环境，可能需要处理 data 协议头
                         if (ws && ws.readyState === WebSocket.OPEN) {
                             if (targetUser) {
                                 ws.send(JSON.stringify({
@@ -3240,10 +3250,24 @@ function addMessage(data, prepend = false) {
         voiceBtn.style.gap = "8px";
         voiceBtn.innerHTML = `<span>🎤</span> <span>[语音消息 - 点击播放]</span>`;
         voiceBtn.onclick = () => {
-            const audio = new Audio(data.voice);
+            const audio = new Audio();
+            const voiceData = data.type === "voice" ? data.voice : data.text;
+            
+            // 兼容性修复：确保 base64 协议头正确
+            // 如果是录制的 webm 数据，确保带有正确的 MIME 类型
+            if (voiceData && !voiceData.startsWith("data:")) {
+                audio.src = "data:audio/webm;base64," + voiceData;
+            } else {
+                audio.src = voiceData;
+            }
+            
             audio.play().catch(err => {
                 console.error("播放失败:", err);
-                alert("播放失败，请检查浏览器权限");
+                if (err.name === "NotAllowedError") {
+                    alert("请在浏览器设置中允许网页播放声音。");
+                } else {
+                    alert("语音文件格式可能不兼容当前浏览器。");
+                }
             });
         };
         bubble.appendChild(voiceBtn);
